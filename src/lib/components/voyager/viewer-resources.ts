@@ -1,3 +1,27 @@
+export interface VoyagerAudioReader {
+	get: (url: string) => Promise<ArrayBuffer>;
+	loadingManager: { itemEnd: (url: string) => void };
+}
+
+/** Backport Voyager 0.66's failed-audio bookkeeping without changing the hosted runtime. */
+export function repairLegacyAudioLoading(reader: VoyagerAudioReader, version: string) {
+	const match = /^0\.(\d+)\./.exec(version);
+	if (!match || Number(match[1]) >= 66) return () => {};
+	const original = reader.get;
+	const installed: VoyagerAudioReader['get'] = (url) => {
+		return original.call(reader, url).catch((error: unknown) => {
+			// Older AudioReaders call itemError but omit itemEnd on HTTP/network errors.
+			// Keep the rejection: audio has failed, but must not strand the scene's busy flag.
+			reader.loadingManager.itemEnd(url);
+			throw error;
+		});
+	};
+	reader.get = installed;
+	return () => {
+		if (reader.get === installed) reader.get = original;
+	};
+}
+
 export class ViewerResources {
 	private controller = new AbortController();
 	private timers = new Set<ReturnType<typeof setTimeout>>();
