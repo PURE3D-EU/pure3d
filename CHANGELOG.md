@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.1.2 - 2026-11-02
+
+### Fixes
+
+- unblock scene loading after failed audio (653b91ae)
+
 ## v2.1.1 - 2026-10-23
 
 ### Fixes
