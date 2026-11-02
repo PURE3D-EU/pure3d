@@ -22,7 +22,9 @@
 		ViewerResources,
 		captureViewerErrors,
 		retainCanvasCapture,
-		ensureViewerScript
+		ensureViewerScript,
+		repairLegacyAudioLoading,
+		type VoyagerAudioReader
 	} from './viewer-resources';
 	import type { VoyagerElement, VoyagerItem, VoyagerTour } from './viewer-runtime';
 	import { base } from '$app/paths';
@@ -159,6 +161,7 @@
 			system?: {
 				components?: {
 					get?: (type: string) => {
+						audioReader?: VoyagerAudioReader;
 						outs?: {
 							sceneLoaded?: RuntimeOutput<boolean>;
 							sceneContentLoaded?: RuntimeOutput<boolean>;
@@ -509,6 +512,11 @@
 		contentScope.defer(() => {
 			if (contentResources === contentScope) completeScene = null;
 		});
+		const audioReader =
+			voyagerElement.application?.system?.components?.get?.('CVAssetReader')?.audioReader;
+		if (audioReader) {
+			contentScope.defer(repairLegacyAudioLoading(audioReader, voyagerVersion));
+		}
 
 		// Fix Voyager modal z-index to appear above sticky header (Shadow DOM)
 		fixVoyagerModalZIndex();
@@ -584,14 +592,15 @@
 				  }
 				| undefined;
 			if (
-				components?.getArray?.('CVModel2').some(
-					(model) => model.activeDerivative?.model && model.object3D?.visible
-				)
+				components
+					?.getArray?.('CVModel2')
+					.some((model) => model.activeDerivative?.model && model.object3D?.visible)
 			)
 				firstModelVisible = true;
 			// Standalone meshes do not set CVViewer.sceneLoaded (only SVX scenes do).
-			const busy = (voyagerElement as CategoryViewer | undefined)?.application?.system
-				?.components?.get?.('CVAssetManager')?.outs?.busy;
+			const busy = (
+				voyagerElement as CategoryViewer | undefined
+			)?.application?.system?.components?.get?.('CVAssetManager')?.outs?.busy;
 			if (!documentPath && (model || geometry) && busy?.value === false) handleRuntimeSceneLoaded();
 		});
 
