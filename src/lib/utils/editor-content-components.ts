@@ -1,5 +1,6 @@
 import { Node } from '@tiptap/core';
-import { TextSelection } from '@tiptap/pm/state';
+import { DOMSerializer } from '@tiptap/pm/model';
+import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import {
 	isCalloutStyle,
 	isCmsColumnCount,
@@ -19,6 +20,167 @@ import {
 	type ProfileCard,
 	type ProjectFact
 } from './content-components';
+
+/** Editor-only chrome. Serialisation still uses each extension's original renderHTML. */
+export function withComponentControls(extension: Node) {
+	return extension.extend({
+		addNodeView() {
+			const parent = this.parent?.();
+			return (props) => {
+				const { editor, getPos } = props;
+				let node = props.node;
+				const labels: Record<string, string> = {
+					cmsCallout: 'Callout',
+					cmsColumns: 'Columns',
+					cmsActions: 'Action links',
+					cmsProfileCards: 'Profile cards',
+					cmsLogoGrid: 'Logo grid',
+					cmsProjectFacts: 'Project facts',
+					cmsEditionGrid: 'Edition grid',
+					cmsOpenCalls: 'Open calls',
+					cmsExpandable: 'Expandable section',
+					contentImageFigure: 'Image',
+					image: 'Image'
+				};
+				const view = parent?.(props);
+				const rendered = view || DOMSerializer.renderSpec(document, node.type.spec.toDOM!(node));
+				const dom = document.createElement('div');
+				dom.className = 'cms-component-node';
+				dom.addEventListener('click', (event) => {
+					if ((event.target as HTMLElement).closest('a, summary')) event.preventDefault();
+				});
+				const controls = document.createElement('div');
+				controls.className = 'cms-component-controls';
+				controls.contentEditable = 'false';
+				controls.setAttribute('role', 'group');
+				controls.setAttribute('aria-label', `${labels[node.type.name]} controls`);
+				const title = document.createElement('strong');
+				title.textContent = labels[node.type.name];
+				controls.append(title);
+				const button = (label: string, action: () => void) => {
+					const button = document.createElement('button');
+					button.type = 'button';
+					button.textContent = label;
+					button.setAttribute('aria-label', `${label} ${labels[node.type.name].toLowerCase()}`);
+					button.addEventListener('mousedown', (event) => event.preventDefault());
+					button.addEventListener('click', (event) => {
+						event.preventDefault();
+						action();
+					});
+					controls.append(button);
+					return button;
+				};
+				const select = () => {
+					const position = getPos();
+					if (typeof position !== 'number') return;
+					editor.commands.setNodeSelection(position);
+					return position;
+				};
+				button('Edit', () => {
+					const position = select();
+					if (position === undefined) return;
+					editor.view.dom.dispatchEvent(
+						new CustomEvent('cms-component-edit', {
+							bubbles: true,
+							detail: { name: node.type.name, position }
+						})
+					);
+				});
+				button('Select', () => {
+					select();
+					editor.view.focus();
+				});
+				// Node-view props and the transaction document can come from different
+				// installed model versions. Read and rearrange only the live document's
+				// own nodes/fragments; never pass a foreign Fragment into a transaction.
+				const moveTarget = (direction: -1 | 1) => {
+					const position = getPos();
+					if (typeof position !== 'number' || position > editor.state.doc.content.size) return;
+					const { state } = editor;
+					const $pos = state.doc.resolve(position);
+					const index = $pos.index();
+					const current = $pos.nodeAfter;
+					const siblingIndex = index + direction;
+					const sibling = $pos.parent.maybeChild(siblingIndex);
+					if (!current || current.type.name !== node.type.name || !sibling) return;
+					const offset = $pos.parentOffset;
+					const siblingOffset =
+						direction < 0 ? offset - sibling.nodeSize : offset + current.nodeSize;
+					const currentContent = $pos.parent.content.cut(offset, offset + current.nodeSize);
+					const siblingContent = $pos.parent.content.cut(
+						siblingOffset,
+						siblingOffset + sibling.nodeSize
+					);
+					const replacement =
+						direction < 0
+							? currentContent.append(siblingContent)
+							: siblingContent.append(currentContent);
+					const first = Math.min(index, siblingIndex);
+					if (!$pos.parent.canReplace(first, first + 2, replacement)) return;
+					const start = direction < 0 ? position - sibling.nodeSize : position;
+					return { start, current, sibling, replacement };
+				};
+				const move = (direction: -1 | 1) => {
+					const target = moveTarget(direction);
+					if (!target) return;
+					const { start, current, sibling, replacement } = target;
+					const { state, view } = editor;
+					const tr = state.tr.replaceWith(
+						start,
+						start + current.nodeSize + sibling.nodeSize,
+						replacement
+					);
+					tr.setSelection(
+						NodeSelection.create(tr.doc, direction < 0 ? start : start + sibling.nodeSize)
+					);
+					view.dispatch(tr.scrollIntoView());
+					view.focus();
+				};
+				const up = button('Move up', () => move(-1));
+				const down = button('Move down', () => move(1));
+				const refreshMoves = () => {
+					up.disabled = !moveTarget(-1);
+					down.disabled = !moveTarget(1);
+				};
+				refreshMoves();
+				controls.addEventListener('focusin', refreshMoves);
+				controls.addEventListener('pointerenter', refreshMoves);
+				button('Duplicate', () => {
+					const position = select();
+					if (position === undefined) return;
+					const current = editor.state.doc.nodeAt(position);
+					if (!current) return;
+					editor
+						.chain()
+						.insertContentAt(position + current.nodeSize, current.toJSON())
+						.run();
+				});
+				button('Delete', () => {
+					if (select() !== undefined) editor.commands.deleteSelection();
+				});
+				dom.append(controls, rendered.dom);
+				if (node.isAtom && rendered.dom instanceof HTMLElement)
+					rendered.dom.contentEditable = 'false';
+				if (rendered.dom instanceof HTMLDetailsElement) rendered.dom.open = true;
+				return {
+					dom,
+					contentDOM: rendered.contentDOM,
+					update: (updatedNode) => {
+						if (updatedNode.isAtom || !updatedNode.sameMarkup(node)) return false;
+						node = updatedNode;
+						refreshMoves();
+						return true;
+					},
+					stopEvent: (event) =>
+						controls.contains(event.target as globalThis.Node) || !!view?.stopEvent?.(event),
+					ignoreMutation: (mutation) =>
+						controls.contains(mutation.target) || (node.isAtom && mutation.type !== 'selection'),
+					destroy: () => view?.destroy?.()
+				};
+			};
+		}
+	});
+}
 
 function profileCards(element: HTMLElement) {
 	return normaliseProfileCards(
@@ -72,11 +234,12 @@ function dataAttributes(values: Record<string, string>) {
 
 function contentImage(element: HTMLElement) {
 	const image = element.querySelector(':scope > img');
-	return normaliseContentImage({
+	const normalised = normaliseContentImage({
 		src: image?.getAttribute('src'),
 		alt: image?.getAttribute('alt'),
 		caption: element.querySelector(':scope > figcaption')?.textContent || ''
 	});
+	return normalised ? { ...normalised, title: image?.getAttribute('title') || null } : null;
 }
 
 function actionAttrs(element: HTMLElement) {
@@ -172,6 +335,7 @@ export const ContentImageFigure = Node.create({
 		return {
 			src: { default: '' },
 			alt: { default: '' },
+			title: { default: null },
 			caption: { default: '' }
 		};
 	},
@@ -189,7 +353,14 @@ export const ContentImageFigure = Node.create({
 		return [
 			'figure',
 			{ 'data-content-image': 'true' },
-			['img', { src: image.src, alt: image.alt }],
+			[
+				'img',
+				{
+					src: image.src,
+					alt: image.alt,
+					...(HTMLAttributes.title ? { title: HTMLAttributes.title } : {})
+				}
+			],
 			...(image.caption ? [['figcaption', {}, image.caption]] : [])
 		];
 	}
@@ -197,8 +368,7 @@ export const ContentImageFigure = Node.create({
 
 export const CmsColumn = Node.create({
 	name: 'cmsColumn',
-	content:
-		'(paragraph | heading | bulletList | orderedList | blockquote | codeBlock | horizontalRule | image | contentImageFigure | videoEmbed | table)+',
+	content: 'block+',
 	defining: true,
 	parseHTML() {
 		return [{ tag: 'div[data-cms-column="true"]' }];
@@ -240,7 +410,7 @@ export const CmsColumns = Node.create({
 						if (state.selection.$from.node(depth).type.name !== 'cmsColumns') continue;
 						const insertAt = state.selection.$from.after(depth);
 						if (dispatch) {
-							const paragraph = state.schema.nodes.paragraph.create();
+							const paragraph = tr.doc.type.schema.nodes.paragraph.create();
 							dispatch(
 								tr
 									.insert(insertAt, paragraph)
@@ -524,7 +694,7 @@ export const CmsExpandable = Node.create({
 						if (state.selection.$from.node(depth).type.name !== 'cmsExpandable') continue;
 						const insertAt = state.selection.$from.after(depth);
 						if (dispatch) {
-							const paragraph = state.schema.nodes.paragraph.create();
+							const paragraph = tr.doc.type.schema.nodes.paragraph.create();
 							dispatch(
 								tr
 									.insert(insertAt, paragraph)

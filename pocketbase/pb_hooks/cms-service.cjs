@@ -116,14 +116,25 @@ function validateComponentHtml(html) {
 	}
 	if (/\bdata-cms-open-calls=|\bdata-open-call-ids=/i.test(withoutOpenCalls))
 		return 'Invalid open calls component.';
-	for (const match of html.matchAll(
-		/<section\b[^>]*\bdata-cms-columns=(['"])([234])\1[^>]*>([\s\S]*?)<\/section>/gi
-	)) {
-		const [, , count, contents] = match;
+	// Profile cards also use <section>; match the column layout's own closing tag,
+	// not the first nested section's closing tag.
+	const sections = [];
+	for (const tag of html.matchAll(/<\/?section\b[^>]*>/gi)) {
+		if (!/^<\//.test(tag[0])) {
+			sections.push({
+				count: attribute(tag[0], 'data-cms-columns'),
+				start: tag.index + tag[0].length
+			});
+			continue;
+		}
+		const section = sections.pop();
+		if (!section || section.count === null) continue;
+		const contents = html.slice(section.start, tag.index);
 		const columns = contents.match(/<div\b[^>]*\bdata-cms-column=(['"])true\1[^>]*>/gi) || [];
-		if (columns.length !== Number(count) || /data-cms-columns/i.test(contents))
+		if (columns.length !== Number(section.count) || /data-cms-columns/i.test(contents))
 			return 'Invalid content component.';
 	}
+	if (sections.some((section) => section.count !== null)) return 'Invalid content component.';
 	const containers = [
 		['section', 'data-cms-profiles', 'article', 'data-cms-profile', 12],
 		['div', 'data-cms-logo-grid', 'figure', 'data-cms-logo', 24],

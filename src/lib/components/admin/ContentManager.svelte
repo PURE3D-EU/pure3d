@@ -9,7 +9,7 @@
 	import RichTextEditor from '$lib/components/ui/RichTextEditor.svelte';
 	import { contentKinds, contentSections, kindLabels } from '$lib/content';
 	import { cleanContent } from '$lib/utils/content-html';
-	import type { RecordModel } from 'pocketbase';
+	import { ClientResponseError, type RecordModel } from 'pocketbase';
 	import toast from 'svelte-french-toast';
 	import { contentPath, validParent, orderedPages, move } from '$lib/cms';
 	import { refreshMenus } from '$lib/stores/navigation';
@@ -82,9 +82,11 @@
 	);
 	let allowed = $derived(authStore.globalRole === 'admin');
 	let filteredOrder = $derived(Boolean(query || kind || status));
+	let openCallsUnavailable = $state(false);
 	async function load() {
 		loading = true;
 		failure = '';
+		openCallsUnavailable = false;
 		try {
 			const [content, categories, media, editions, openCalls] = await Promise.all([
 				pb.collection('content').getFullList({ sort: '-updated' }),
@@ -95,11 +97,20 @@
 					fields: 'id,title,dcTitle',
 					sort: 'dcTitle,title'
 				}),
-				pb.collection('open_calls').getFullList({
-					filter: 'isPublished = true',
-					fields: 'id,title',
-					sort: 'order,title'
-				})
+				pb
+					.collection('open_calls')
+					.getFullList({
+						filter: 'isPublished = true',
+						fields: 'id,title',
+						sort: 'order,title'
+					})
+					.catch((error: unknown) => {
+						// Older/local databases may not have the optional Open calls migration yet.
+						// Keep pages editable, but do not hide permission or connectivity failures.
+						if (!(error instanceof ClientResponseError) || error.status !== 404) throw error;
+						openCallsUnavailable = true;
+						return [];
+					})
 			]);
 			items = content;
 			categoryOptions = categories;
@@ -414,6 +425,11 @@
 		{#if failure}<div role="alert" class="alert alert-error">
 				{failure}<button onclick={load}>Retry</button>
 			</div>{/if}
+		{#if !failure && openCallsUnavailable}<div role="status" class="mb-4 alert alert-warning">
+				Open calls are not configured in this database. You can still edit pages and posts; adding
+				Open calls components is unavailable until the Open calls migration is applied.
+				<button type="button" class="btn btn-sm" onclick={load}>Retry</button>
+			</div>{/if}
 		{#if selected}
 			<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 				<button
@@ -477,6 +493,7 @@
 								cmsComponents
 								{cmsEditions}
 								{cmsOpenCalls}
+								cmsOpenCallsEnabled={!openCallsUnavailable}
 								onchange={(html) => {
 									body = html;
 									dirty = true;

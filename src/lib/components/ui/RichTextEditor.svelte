@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { Editor } from '@tiptap/core';
+	import MediaImageField from './MediaImageField.svelte';
 	import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 	import StarterKit from '@tiptap/starter-kit';
 	import Link from '@tiptap/extension-link';
@@ -13,6 +14,7 @@
 	import Placeholder from '@tiptap/extension-placeholder';
 	import { VideoEmbed, embedUrl } from '$lib/utils/editor-embed';
 	import {
+		withComponentControls,
 		CmsActions,
 		CmsCallout,
 		CmsColumn,
@@ -27,7 +29,6 @@
 		CmsSummary,
 		calloutContent,
 		columnsContent,
-		contentImageFigure,
 		expandableContent,
 		logoGridContent,
 		profileCardsContent,
@@ -118,8 +119,23 @@
 
 	let element: HTMLDivElement;
 	let editor: Editor | null = $state(null);
+	let transactionVersion = $state(0);
+	function isActive(name: string, attrs?: Record<string, unknown>) {
+		void transactionVersion;
+		return editor?.isActive(name, attrs) ?? false;
+	}
+	function attributes(name: string) {
+		void transactionVersion;
+		return editor?.getAttributes(name) || {};
+	}
+	function canHistory(action: 'undo' | 'redo') {
+		void transactionVersion;
+		return editor?.can()[action]() ?? false;
+	}
 	let isUploadingImage = $state(false);
 	let editionPickerOpen = $state(false);
+	let editionSearch = $state<HTMLInputElement>();
+	let openCallSearch = $state<HTMLInputElement>();
 	let editionQuery = $state('');
 	let editionIds = $state<string[]>([]);
 	let editionLimitReached = $state(false);
@@ -129,7 +145,15 @@
 	let openCallLimitReached = $state(false);
 	let insertMenu = $state<HTMLDetailsElement>();
 	let insertMenuSummary = $state<HTMLElement>();
-	type ComponentEditorKind = 'profiles' | 'logos' | 'facts' | 'image';
+	type ComponentEditorKind =
+		| 'profiles'
+		| 'logos'
+		| 'facts'
+		| 'image'
+		| 'actions'
+		| 'callout'
+		| 'columns'
+		| 'expandable';
 	let componentDialog = $state<HTMLDialogElement>();
 	let componentEditorKind = $state<ComponentEditorKind>();
 	let componentEditorError = $state('');
@@ -138,6 +162,40 @@
 	let draftLogos = $state<LogoItem[]>([]);
 	let draftFacts = $state<ProjectFact[]>([]);
 	let draftImage = $state<ContentImage>({ src: '', alt: '', caption: '' });
+	let draftImageTitle = $state('');
+	let draftActions = $state({
+		primaryLabel: '',
+		primaryHref: '',
+		secondaryLabel: '',
+		secondaryHref: ''
+	});
+	let draftStyle = $state<CalloutStyle>('info');
+	let draftColumnCount = $state(2);
+	let draftSummary = $state('');
+	let mediaBusy = $state(false);
+	type EditorDocument = Editor['state']['doc'];
+	let dialogDocument: EditorDocument | undefined;
+	let transferBlocks = $state<{ position: number; label: string; items: ProfileCard[] }[]>([]);
+	let profileDestinations = $state<number[]>([]);
+	let recordTarget: { name: string; position: number } | undefined;
+	let recordDocument: EditorDocument | undefined;
+	let pickerError = $state('');
+	function saveRecords(name: string, ids: string) {
+		if (!editor) return false;
+		if (recordDocument !== editor.state.doc) {
+			pickerError = 'Content changed. Cancel and reopen the picker before saving.';
+			return false;
+		}
+		return editor.commands.command(({ state, tr, dispatch }) => {
+			if (recordTarget) {
+				const node = state.doc.nodeAt(recordTarget.position);
+				if (node?.type.name !== name) return false;
+				tr.setNodeMarkup(recordTarget.position, undefined, { ...node.attrs, ids });
+			} else tr.replaceSelectionWith(state.doc.type.schema.nodes[name].create({ ids }));
+			if (dispatch) dispatch(tr.scrollIntoView());
+			return true;
+		});
+	}
 	let matchingEditions = $derived(
 		cmsEditions.filter(
 			(edition) =>
@@ -160,60 +218,91 @@
 				StarterKit.configure({ link: false, underline: false }),
 				Underline,
 				Link.configure({ openOnClick: false }),
-				Image,
-				ContentImageFigure,
+				withComponentControls(Image),
+				withComponentControls(ContentImageFigure),
 				VideoEmbed,
 				Table.configure({ resizable: true }),
 				TableRow,
 				TableCell,
 				TableHeader,
 				Placeholder.configure({ placeholder }),
-				...(cmsComponents
-					? [
-							CmsCallout,
-							CmsActions,
-							CmsColumn,
-							CmsColumns,
-							CmsEditionGrid.configure({
-								editionTitle: (id: string) =>
-									cmsEditions.find((edition) => edition.id === id)?.title || id
-							}),
-							...(cmsOpenCallsEnabled
-								? [
-										CmsOpenCalls.configure({
-											openCallTitle: (id: string) =>
-												cmsOpenCalls.find((call) => call.id === id)?.title || id
-										})
-									]
-								: []),
-							CmsSummary,
-							CmsExpandable,
-							CmsProfileCards,
-							CmsLogoGrid,
-							CmsProjectFacts
-						]
-					: [])
+				...[
+					withComponentControls(CmsCallout),
+					withComponentControls(CmsActions),
+					CmsColumn,
+					withComponentControls(CmsColumns),
+					withComponentControls(
+						CmsEditionGrid.configure({
+							editionTitle: (id: string) =>
+								cmsEditions.find((edition) => edition.id === id)?.title || id
+						})
+					),
+					withComponentControls(
+						CmsOpenCalls.configure({
+							openCallTitle: (id: string) =>
+								cmsOpenCalls.find((call) => call.id === id)?.title || id
+						})
+					),
+					CmsSummary,
+					withComponentControls(CmsExpandable),
+					withComponentControls(CmsProfileCards),
+					withComponentControls(CmsLogoGrid),
+					withComponentControls(CmsProjectFacts)
+				]
 			],
 			content,
+			editorProps: {
+				handleClick: (_view, _position, event) => {
+					if ((event.target as HTMLElement).closest('a')) {
+						event.preventDefault();
+						return true;
+					}
+					return false;
+				}
+			},
 			onTransaction: () => {
-				editor = editor;
+				transactionVersion++;
 			},
 			onUpdate: ({ editor: e }) => {
 				onchange?.(e.getHTML());
 			}
 		});
+		element.addEventListener('cms-component-edit', handleComponentEdit);
 	});
 
 	// Update editor content when the content prop changes externally
 	$effect(() => {
-		if (editor && content !== editor.getHTML()) {
-			editor.commands.setContent(content, {});
-		}
+		// Toolbar transactions must not reapply a stale parent prop or erase redo history.
+		const incoming = content;
+		untrack(() => {
+			if (editor && incoming !== editor.getHTML()) {
+				editor.commands.setContent(incoming, { emitUpdate: false });
+			}
+		});
 	});
 
 	onDestroy(() => {
+		element?.removeEventListener('cms-component-edit', handleComponentEdit);
 		editor?.destroy();
 	});
+
+	function handleComponentEdit(event: Event) {
+		const { name } = (event as CustomEvent<{ name: string }>).detail;
+		const kinds: Record<string, ComponentEditorKind> = {
+			cmsProfileCards: 'profiles',
+			cmsLogoGrid: 'logos',
+			cmsProjectFacts: 'facts',
+			contentImageFigure: 'image',
+			image: 'image',
+			cmsActions: 'actions',
+			cmsCallout: 'callout',
+			cmsColumns: 'columns',
+			cmsExpandable: 'expandable'
+		};
+		if (name === 'cmsEditionGrid') editEditionGrid();
+		else if (name === 'cmsOpenCalls') editOpenCalls();
+		else if (kinds[name]) openComponentEditor(kinds[name]);
+	}
 
 	function setLink() {
 		if (!editor) return;
@@ -247,8 +336,13 @@
 
 	function setCallout(style: CalloutStyle) {
 		if (!editor) return;
-		if (editor.isActive('cmsCallout'))
-			editor.chain().focus().updateAttributes('cmsCallout', { style }).run();
+		const target = selectedNode('cmsCallout') || activeNode('cmsCallout');
+		if (target)
+			editor.commands.command(({ tr, dispatch }) => {
+				if (dispatch)
+					dispatch(tr.setNodeMarkup(target.position, undefined, { ...target.node.attrs, style }));
+				return true;
+			});
 		else editor.chain().focus().insertContent(calloutContent(style)).run();
 	}
 
@@ -271,11 +365,12 @@
 
 	function activeNode(name: string) {
 		if (!editor) return null;
-		for (let depth = editor.state.selection.$from.depth; depth > 0; depth--) {
-			if (editor.state.selection.$from.node(depth).type.name === name)
+		const from = editor.state.doc.resolve(editor.state.selection.from);
+		for (let depth = from.depth; depth > 0; depth--) {
+			if (from.node(depth).type.name === name)
 				return {
-					node: editor.state.selection.$from.node(depth),
-					position: editor.state.selection.$from.before(depth)
+					node: from.node(depth),
+					position: from.before(depth)
 				};
 		}
 		return null;
@@ -283,10 +378,10 @@
 
 	function setColumns(value: number) {
 		if (!editor || !isCmsColumnCount(value)) return;
-		const active = activeNode('cmsColumns');
+		const active = selectedNode('cmsColumns') || activeNode('cmsColumns');
 		if (!active) editor.chain().focus().insertContent(columnsContent(value)).run();
 		else {
-			const schema = editor.schema;
+			const schema = editor.state.doc.type.schema;
 			const columnType = schema.nodes.cmsColumn;
 			const columns = Array.from({ length: value }, (_, index) => {
 				const content = Array.from(active.node.maybeChild(index)?.content.content || []);
@@ -313,9 +408,8 @@
 
 	function selectedNode(name: string) {
 		if (!editor || !(editor.state.selection instanceof NodeSelection)) return null;
-		return editor.state.selection.node.type.name === name
-			? { node: editor.state.selection.node, position: editor.state.selection.from }
-			: null;
+		const node = editor.state.doc.nodeAt(editor.state.selection.from);
+		return node?.type.name === name ? { node, position: editor.state.selection.from } : null;
 	}
 
 	function openComponentEditor(kind: ComponentEditorKind) {
@@ -324,18 +418,47 @@
 			profiles: 'cmsProfileCards',
 			logos: 'cmsLogoGrid',
 			facts: 'cmsProjectFacts',
-			image: 'contentImageFigure'
+			image: 'contentImageFigure',
+			actions: 'cmsActions',
+			callout: 'cmsCallout',
+			columns: 'cmsColumns',
+			expandable: 'cmsExpandable'
 		} as const;
 		const selected = selectedNode(names[kind]);
 		componentEditorTarget = selected
 			? { name: names[kind], position: selected.position }
 			: undefined;
 		componentEditorError = '';
+		dialogDocument = editor.state.doc;
+		mediaBusy = false;
+		if (kind === 'actions')
+			draftActions = {
+				primaryLabel: 'Learn more',
+				primaryHref: '',
+				secondaryLabel: '',
+				secondaryHref: '',
+				...selected?.node.attrs
+			};
+		if (kind === 'callout') draftStyle = selected?.node.attrs.style || 'info';
+		if (kind === 'columns') draftColumnCount = selected?.node.childCount || 2;
+		if (kind === 'expandable') draftSummary = selected?.node.firstChild?.textContent || '';
 		if (kind === 'profiles') {
 			const items = normaliseProfileCards(selected?.node.attrs.items || []);
 			draftProfiles = items.length
 				? items
 				: [{ name: '', role: '', bio: '', image: '', alt: '', links: [] }];
+			profileDestinations = draftProfiles.map(() => -1);
+			transferBlocks = [];
+			let heading = '';
+			editor.state.doc.descendants((node, position) => {
+				if (node.type.name === 'heading') heading = node.textContent;
+				if (node.type.name === 'cmsProfileCards' && position !== selected?.position)
+					transferBlocks.push({
+						position,
+						label: `${heading || 'Profile cards'} · ${node.attrs.items.map((item: ProfileCard) => item.name).join(', ')}`,
+						items: normaliseProfileCards(node.attrs.items)
+					});
+			});
 		}
 		if (kind === 'logos') {
 			const items = normaliseLogoItems(selected?.node.attrs.items || []);
@@ -347,6 +470,7 @@
 		}
 		if (kind === 'image') {
 			const legacyImage = selectedNode('image');
+			draftImageTitle = selected?.node.attrs.title || legacyImage?.node.attrs.title || '';
 			componentEditorTarget = legacyImage
 				? { name: 'image', position: legacyImage.position }
 				: componentEditorTarget;
@@ -365,7 +489,8 @@
 		componentDialog?.close();
 	}
 
-	function addComponentItem(kind: Exclude<ComponentEditorKind, 'image'>) {
+	function addComponentItem(kind: 'profiles' | 'logos' | 'facts') {
+		if (kind === 'profiles') profileDestinations = [...profileDestinations, -1];
 		if (kind === 'profiles')
 			draftProfiles = [
 				...draftProfiles,
@@ -376,7 +501,7 @@
 	}
 
 	function moveComponentItem(
-		kind: Exclude<ComponentEditorKind, 'image'>,
+		kind: 'profiles' | 'logos' | 'facts',
 		index: number,
 		direction: -1 | 1
 	) {
@@ -387,12 +512,17 @@
 			[next[index], next[target]] = [next[target], next[index]];
 			return next;
 		};
-		if (kind === 'profiles') draftProfiles = move(draftProfiles);
+		if (kind === 'profiles') {
+			draftProfiles = move(draftProfiles);
+			profileDestinations = move(profileDestinations);
+		}
 		if (kind === 'logos') draftLogos = move(draftLogos);
 		if (kind === 'facts') draftFacts = move(draftFacts);
 	}
 
-	function removeComponentItem(kind: Exclude<ComponentEditorKind, 'image'>, index: number) {
+	function removeComponentItem(kind: 'profiles' | 'logos' | 'facts', index: number) {
+		if (kind === 'profiles')
+			profileDestinations = profileDestinations.filter((_, itemIndex) => itemIndex !== index);
 		if (kind === 'profiles')
 			draftProfiles = draftProfiles.filter((_, itemIndex) => itemIndex !== index);
 		if (kind === 'logos') draftLogos = draftLogos.filter((_, itemIndex) => itemIndex !== index);
@@ -428,7 +558,93 @@
 
 	function saveComponentEditor() {
 		if (!editor || !componentEditorKind) return;
+		if (mediaBusy) return;
+		if (dialogDocument !== editor.state.doc) {
+			componentEditorError =
+				'Content changed while this dialog was open. Cancel and reopen it before saving.';
+			return;
+		}
 		const component = componentEditorKind;
+		const emptyList =
+			component === 'profiles'
+				? !draftProfiles.length
+				: component === 'logos'
+					? !draftLogos.length
+					: component === 'facts'
+						? !draftFacts.length
+						: false;
+		if (emptyList && componentEditorTarget) {
+			editor.commands.setNodeSelection(componentEditorTarget.position);
+			editor.commands.deleteSelection();
+			closeComponentEditor();
+			return;
+		}
+		if (component === 'image' && !draftImage.src.trim() && componentEditorTarget) {
+			const target = componentEditorTarget;
+			editor.commands.command(({ state, tr, dispatch }) => {
+				const node = state.doc.nodeAt(target.position);
+				if (node?.type.name !== target.name) return false;
+				if (dispatch)
+					dispatch(
+						tr.replaceWith(
+							target.position,
+							target.position + node.nodeSize,
+							state.doc.type.schema.nodes.paragraph.create()
+						)
+					);
+				return true;
+			});
+			closeComponentEditor();
+			return;
+		}
+		if (['actions', 'callout', 'columns', 'expandable'].includes(component)) {
+			const target = componentEditorTarget;
+			if (component === 'actions') {
+				const primaryHref = safeContentUrl(draftActions.primaryHref);
+				const secondaryHref = draftActions.secondaryHref
+					? safeContentUrl(draftActions.secondaryHref)
+					: '';
+				if (
+					!draftActions.primaryLabel.trim() ||
+					!primaryHref ||
+					(draftActions.secondaryLabel.trim() ? !secondaryHref : !!draftActions.secondaryHref)
+				) {
+					componentEditorError =
+						'Enter a primary label and safe destination. Complete both secondary fields or leave both empty.';
+					return;
+				}
+				const attrs = {
+					...draftActions,
+					primaryLabel: draftActions.primaryLabel.trim(),
+					secondaryLabel: draftActions.secondaryLabel.trim(),
+					primaryHref,
+					secondaryHref
+				};
+				if (target) editor.commands.updateAttributes('cmsActions', attrs);
+				else editor.commands.insertContent({ type: 'cmsActions', attrs });
+			} else if (component === 'callout') setCallout(draftStyle);
+			else if (component === 'columns') setColumns(draftColumnCount);
+			else if (target) {
+				if (!draftSummary.trim()) {
+					componentEditorError = 'Enter a section title.';
+					return;
+				}
+				const summary = editor.state.doc.nodeAt(target.position)?.firstChild;
+				if (summary && draftSummary !== summary.textContent)
+					editor.commands.command(({ tr, dispatch }) => {
+						const start = target.position + 1;
+						const replacement = summary.type.create(
+							summary.attrs,
+							tr.doc.type.schema.text(draftSummary),
+							summary.marks
+						);
+						if (dispatch) dispatch(tr.replaceWith(start, start + summary.nodeSize, replacement));
+						return true;
+					});
+			}
+			closeComponentEditor();
+			return;
+		}
 		const normalised =
 			component === 'profiles'
 				? normaliseProfileCards(draftProfiles)
@@ -459,20 +675,83 @@
 					? logoGridContent(normalised as LogoItem[])
 					: component === 'facts'
 						? projectFactsContent(normalised as ProjectFact[])
-						: contentImageFigure(normalised as ContentImage);
+						: {
+								type: 'contentImageFigure',
+								attrs: { ...(normalised as ContentImage), title: draftImageTitle || null }
+							};
+		if (component === 'profiles' && profileDestinations.some((position) => position !== -1)) {
+			const profiles = normalised as ProfileCard[];
+			const transfers = transferBlocks
+				.map((block) => ({
+					...block,
+					items: [
+						...normaliseProfileCards(block.items),
+						...profiles.filter((_, index) => profileDestinations[index] === block.position)
+					]
+				}))
+				.filter((block) =>
+					profiles.some((_, index) => profileDestinations[index] === block.position)
+				);
+			if (transfers.some((block) => block.items.length > maxProfileCards)) {
+				componentEditorError = `A destination can contain at most ${maxProfileCards} profiles. No changes have been saved.`;
+				return;
+			}
+			editor.commands.command(({ tr, dispatch, state }) => {
+				// Attribute updates do not shift positions; remove the source only afterwards.
+				for (const block of transfers) {
+					const node = state.doc.nodeAt(block.position)!;
+					tr.setNodeMarkup(block.position, undefined, { ...node.attrs, items: block.items });
+				}
+				const remaining = profiles.filter((_, index) => profileDestinations[index] === -1);
+				const target = componentEditorTarget;
+				if (target) {
+					const node = state.doc.nodeAt(target.position)!;
+					if (remaining.length)
+						tr.setNodeMarkup(target.position, undefined, { ...node.attrs, items: remaining });
+					else
+						tr.replaceWith(
+							target.position,
+							target.position + node.nodeSize,
+							state.doc.type.schema.nodes.paragraph.create()
+						);
+				} else if (remaining.length)
+					tr.replaceSelectionWith(
+						state.doc.type.schema.nodeFromJSON(profileCardsContent(remaining))
+					);
+				if (dispatch) dispatch(tr.scrollIntoView());
+				return true;
+			});
+			closeComponentEditor();
+			return;
+		}
 		editor.commands.command(({ state, tr, dispatch }) => {
 			const target = componentEditorTarget;
 			if (target && state.doc.nodeAt(target.position)?.type.name === target.name) {
 				const node = state.doc.nodeAt(target.position)!;
 				if (target.name === 'image')
-					tr.replaceWith(
-						target.position,
-						target.position + node.nodeSize,
-						state.schema.nodeFromJSON(content)
-					);
+					if (draftImage.caption)
+						tr.replaceWith(
+							target.position,
+							target.position + node.nodeSize,
+							state.doc.type.schema.nodeFromJSON({
+								...content,
+								attrs: { ...content.attrs, title: draftImageTitle || null }
+							})
+						);
+					else
+						tr.setNodeMarkup(target.position, undefined, {
+							...node.attrs,
+							src: draftImage.src,
+							alt: draftImage.alt,
+							title: draftImageTitle || null
+						});
 				else
-					tr.setNodeMarkup(target.position, undefined, { ...node.attrs, ...(content.attrs || {}) });
-			} else tr.replaceSelectionWith(state.schema.nodeFromJSON(content));
+					tr.setNodeMarkup(target.position, undefined, {
+						...node.attrs,
+						...(content.attrs || {}),
+						...(component === 'image' ? { title: draftImageTitle || null } : {})
+					});
+			} else tr.replaceSelectionWith(state.doc.type.schema.nodeFromJSON(content));
 			if (dispatch) dispatch(tr.scrollIntoView());
 			return true;
 		});
@@ -480,34 +759,16 @@
 	}
 
 	function setActions() {
-		if (!editor) return;
-		const current = editor.isActive('cmsActions') ? editor.getAttributes('cmsActions') : {};
-		const primaryLabel = window.prompt(
-			'Primary action label',
-			current.primaryLabel || 'Learn more'
-		);
-		if (!primaryLabel?.trim()) return;
-		const primaryHref = safeContentUrl(
-			window.prompt('Primary action destination', current.primaryHref || '') || ''
-		);
-		if (!primaryHref) return window.alert('Enter a safe local, HTTPS, HTTP or mailto destination.');
-		const secondaryLabel =
-			window.prompt('Secondary action label (optional)', current.secondaryLabel || '') || '';
-		const secondaryHref = secondaryLabel
-			? safeContentUrl(
-					window.prompt('Secondary action destination', current.secondaryHref || '') || ''
-				)
-			: '';
-		if (secondaryLabel && !secondaryHref)
-			return window.alert('Enter a safe local, HTTPS, HTTP or mailto destination.');
-		const attrs = { primaryLabel: primaryLabel.trim(), primaryHref, secondaryLabel, secondaryHref };
-		if (editor.isActive('cmsActions'))
-			editor.chain().focus().updateAttributes('cmsActions', attrs).run();
-		else editor.chain().focus().insertContent({ type: 'cmsActions', attrs }).run();
+		openComponentEditor('actions');
 	}
 
-	function editEditionGrid() {
+	async function editEditionGrid() {
 		if (!editor) return;
+		const selected = selectedNode('cmsEditionGrid');
+		recordDocument = editor.state.doc;
+		recordTarget = selected ? { name: 'cmsEditionGrid', position: selected.position } : undefined;
+		pickerError = '';
+		openCallPickerOpen = false;
 		editionIds = editor.isActive('cmsEditionGrid')
 			? parseEditionIds(editor.getAttributes('cmsEditionGrid').ids || '')
 			: [];
@@ -515,9 +776,12 @@
 		editionLimitReached = false;
 		editionPickerOpen = true;
 		closeInsertMenu();
+		await tick();
+		editionSearch?.focus();
 	}
 
 	function addEdition(id: string) {
+		if (editionIds.includes(id)) return;
 		if (editionIds.length >= maxEditionReferences) {
 			editionLimitReached = true;
 			return;
@@ -534,14 +798,16 @@
 			editionLimitReached = error instanceof Error;
 			return;
 		}
-		if (editor.isActive('cmsEditionGrid'))
-			editor.chain().focus().updateAttributes('cmsEditionGrid', attrs).run();
-		else editor.chain().focus().insertContent({ type: 'cmsEditionGrid', attrs }).run();
-		editionPickerOpen = false;
+		if (saveRecords('cmsEditionGrid', attrs.ids)) editionPickerOpen = false;
 	}
 
-	function editOpenCalls() {
+	async function editOpenCalls() {
 		if (!editor) return;
+		const selected = selectedNode('cmsOpenCalls');
+		recordDocument = editor.state.doc;
+		recordTarget = selected ? { name: 'cmsOpenCalls', position: selected.position } : undefined;
+		pickerError = '';
+		editionPickerOpen = false;
 		openCallIds = editor.isActive('cmsOpenCalls')
 			? parseOpenCallIds(editor.getAttributes('cmsOpenCalls').ids || '')
 			: [];
@@ -549,9 +815,12 @@
 		openCallLimitReached = false;
 		openCallPickerOpen = true;
 		closeInsertMenu();
+		await tick();
+		openCallSearch?.focus();
 	}
 
 	function addOpenCall(id: string) {
+		if (openCallIds.includes(id)) return;
 		if (openCallIds.length >= maxOpenCallReferences) {
 			openCallLimitReached = true;
 			return;
@@ -568,10 +837,7 @@
 			openCallLimitReached = error instanceof Error;
 			return;
 		}
-		if (editor.isActive('cmsOpenCalls'))
-			editor.chain().focus().updateAttributes('cmsOpenCalls', attrs).run();
-		else editor.chain().focus().insertContent({ type: 'cmsOpenCalls', attrs }).run();
-		openCallPickerOpen = false;
+		if (saveRecords('cmsOpenCalls', attrs.ids)) openCallPickerOpen = false;
 	}
 
 	async function handlePaste(event: ClipboardEvent) {
@@ -603,13 +869,27 @@
 <div id="rich-text-editor" class="rounded-box border border-base-300 bg-base-100">
 	<!-- Toolbar -->
 	<div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+		<div class="toolbar-group" role="group" aria-label="Edit history">
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm"
+				disabled={!canHistory('undo')}
+				onclick={() => editor?.chain().focus().undo().run()}>Undo</button
+			>
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm"
+				disabled={!canHistory('redo')}
+				onclick={() => editor?.chain().focus().redo().run()}>Redo</button
+			>
+		</div>
 		<div class="toolbar-group" role="group" aria-label="Text style">
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('bold')}
+				class:is-active={isActive('bold')}
 				aria-label="Bold"
-				aria-pressed={editor?.isActive('bold') ?? false}
+				aria-pressed={isActive('bold')}
 				title="Bold"
 				disabled={!editor}
 				onclick={() => editor?.chain().focus().toggleBold().run()}><BoldIcon /></button
@@ -617,9 +897,9 @@
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('italic')}
+				class:is-active={isActive('italic')}
 				aria-label="Italic"
-				aria-pressed={editor?.isActive('italic') ?? false}
+				aria-pressed={isActive('italic')}
 				title="Italic"
 				disabled={!editor}
 				onclick={() => editor?.chain().focus().toggleItalic().run()}><ItalicIcon /></button
@@ -627,9 +907,9 @@
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('underline')}
+				class:is-active={isActive('underline')}
 				aria-label="Underline"
-				aria-pressed={editor?.isActive('underline') ?? false}
+				aria-pressed={isActive('underline')}
 				title="Underline"
 				disabled={!editor}
 				onclick={() => editor?.chain().focus().toggleUnderline().run()}><UnderlineIcon /></button
@@ -641,9 +921,9 @@
 				<button
 					type="button"
 					class="toolbar-button"
-					class:is-active={editor?.isActive('heading', { level })}
+					class:is-active={isActive('heading', { level })}
 					aria-label={`Heading ${level}`}
-					aria-pressed={editor?.isActive('heading', { level }) ?? false}
+					aria-pressed={isActive('heading', { level })}
 					title={`Heading ${level}`}
 					disabled={!editor}
 					onclick={() =>
@@ -663,9 +943,9 @@
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('bulletList')}
+				class:is-active={isActive('bulletList')}
 				aria-label="Bulleted list"
-				aria-pressed={editor?.isActive('bulletList') ?? false}
+				aria-pressed={isActive('bulletList')}
 				title="Bulleted list"
 				disabled={!editor}
 				onclick={() => editor?.chain().focus().toggleBulletList().run()}><ListIcon /></button
@@ -673,9 +953,9 @@
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('orderedList')}
+				class:is-active={isActive('orderedList')}
 				aria-label="Numbered list"
-				aria-pressed={editor?.isActive('orderedList') ?? false}
+				aria-pressed={isActive('orderedList')}
 				title="Numbered list"
 				disabled={!editor}
 				onclick={() => editor?.chain().focus().toggleOrderedList().run()}
@@ -684,9 +964,9 @@
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('blockquote')}
+				class:is-active={isActive('blockquote')}
 				aria-label="Block quote"
-				aria-pressed={editor?.isActive('blockquote') ?? false}
+				aria-pressed={isActive('blockquote')}
 				title="Block quote"
 				disabled={!editor}
 				onclick={() => editor?.chain().focus().toggleBlockquote().run()}><QuoteIcon /></button
@@ -697,9 +977,9 @@
 			<button
 				type="button"
 				class="toolbar-button"
-				class:is-active={editor?.isActive('link')}
+				class:is-active={isActive('link')}
 				aria-label="Add or edit link"
-				aria-pressed={editor?.isActive('link') ?? false}
+				aria-pressed={isActive('link')}
 				title="Add or edit link"
 				disabled={!editor}
 				onclick={setLink}><LinkIcon /></button
@@ -804,17 +1084,17 @@
 						>
 					</div>
 				</details>
-				{#if editor?.isActive('cmsCallout')}
+				{#if isActive('cmsCallout')}
 					<label class="callout-style" title="Callout style"
 						><span class="sr-only">Callout style</span><InfoIcon /><select
-							value={editor.getAttributes('cmsCallout').style}
+							value={attributes('cmsCallout').style}
 							onchange={(event) => setCallout(event.currentTarget.value as CalloutStyle)}
 							>{#each calloutStyles as style (style)}<option value={style}>{style}</option
 								>{/each}</select
 						></label
 					>
 				{/if}
-				{#if editor?.isActive('cmsActions')}
+				{#if isActive('cmsActions')}
 					<button
 						type="button"
 						class="toolbar-button"
@@ -823,7 +1103,7 @@
 						onclick={setActions}><PencilIcon /></button
 					>
 				{/if}
-				{#if editor?.isActive('cmsEditionGrid')}
+				{#if isActive('cmsEditionGrid')}
 					<button
 						type="button"
 						class="toolbar-button"
@@ -832,7 +1112,7 @@
 						onclick={editEditionGrid}><LayoutGridIcon /></button
 					>
 				{/if}
-				{#if editor?.isActive('cmsOpenCalls')}
+				{#if isActive('cmsOpenCalls')}
 					<button
 						type="button"
 						class="toolbar-button"
@@ -841,10 +1121,10 @@
 						onclick={editOpenCalls}><MegaphoneIcon /></button
 					>
 				{/if}
-				{#if editor?.isActive('cmsColumns')}
+				{#if isActive('cmsColumns')}
 					<label class="callout-style" title="Column count"
 						><span class="sr-only">Column count</span><LayoutGridIcon /><select
-							value={editor.getAttributes('cmsColumns').count}
+							value={attributes('cmsColumns').count}
 							onchange={(event) => setColumns(Number(event.currentTarget.value))}
 							><option value="2">2 columns</option><option value="3">3 columns</option><option
 								value="4">4 columns</option
@@ -852,7 +1132,7 @@
 						></label
 					>
 				{/if}
-				{#if editor?.isActive('cmsProfileCards')}
+				{#if isActive('cmsProfileCards')}
 					<button
 						type="button"
 						class="toolbar-button"
@@ -861,7 +1141,7 @@
 						onclick={() => openComponentEditor('profiles')}><PencilIcon /></button
 					>
 				{/if}
-				{#if editor?.isActive('cmsLogoGrid')}
+				{#if isActive('cmsLogoGrid')}
 					<button
 						type="button"
 						class="toolbar-button"
@@ -870,7 +1150,7 @@
 						onclick={() => openComponentEditor('logos')}><PencilIcon /></button
 					>
 				{/if}
-				{#if editor?.isActive('cmsProjectFacts')}
+				{#if isActive('cmsProjectFacts')}
 					<button
 						type="button"
 						class="toolbar-button"
@@ -884,11 +1164,16 @@
 	</div>
 	{#if editionPickerOpen}
 		<div class="space-y-3 border-b border-base-300 p-3">
+			<p class="text-sm">
+				Source: explicitly selected published edition records, displayed in the order below.
+			</p>
+			{#if pickerError}<p role="alert" class="text-error">{pickerError}</p>{/if}
 			<label class="block text-sm font-medium"
 				>Choose published editions<input
 					class="input mt-1 w-full"
 					type="search"
 					placeholder="Search editions…"
+					bind:this={editionSearch}
 					bind:value={editionQuery}
 				/></label
 			>
@@ -897,7 +1182,9 @@
 					{#each editionIds as id, index (id)}
 						{@const edition = cmsEditions.find((item) => item.id === id)}
 						<li class="flex items-center gap-2 text-sm">
-							<span class="min-w-0 flex-1 truncate">{edition?.title || id}</span>
+							<span class="min-w-0 flex-1 truncate"
+								>{edition?.title || 'Unavailable edition'} · {id}</span
+							>
 							<button
 								type="button"
 								class="picker-icon-button"
@@ -949,7 +1236,7 @@
 					<button
 						type="button"
 						class="block min-h-11 w-full px-3 text-left text-sm hover:bg-base-200"
-						onclick={() => addEdition(edition.id)}>{edition.title}</button
+						onclick={() => addEdition(edition.id)}>{edition.title} · {edition.id}</button
 					>
 				{/each}
 			</div>
@@ -958,7 +1245,7 @@
 					type="button"
 					class="btn btn-sm btn-primary"
 					disabled={!editionIds.length}
-					onclick={saveEditionGrid}>Insert edition grid</button
+					onclick={saveEditionGrid}>Save edition grid</button
 				>
 				<button type="button" class="btn btn-sm" onclick={() => (editionPickerOpen = false)}
 					>Cancel</button
@@ -968,11 +1255,16 @@
 	{/if}
 	{#if openCallPickerOpen}
 		<div class="space-y-3 border-b border-base-300 p-3">
+			<p class="text-sm">
+				Source: explicitly selected published open call records, displayed in the order below.
+			</p>
+			{#if pickerError}<p role="alert" class="text-error">{pickerError}</p>{/if}
 			<label class="block text-sm font-medium"
 				>Choose published open calls<input
 					class="input mt-1 w-full"
 					type="search"
 					placeholder="Search open calls…"
+					bind:this={openCallSearch}
 					bind:value={openCallQuery}
 				/></label
 			>
@@ -981,7 +1273,9 @@
 					{#each openCallIds as id, index (id)}
 						{@const call = cmsOpenCalls.find((item) => item.id === id)}
 						<li class="flex items-center gap-2 text-sm">
-							<span class="min-w-0 flex-1 truncate">{call?.title || id}</span>
+							<span class="min-w-0 flex-1 truncate"
+								>{call?.title || 'Unavailable open call'} · {id}</span
+							>
 							<button
 								type="button"
 								class="picker-icon-button"
@@ -1033,7 +1327,7 @@
 					<button
 						type="button"
 						class="block min-h-11 w-full px-3 text-left text-sm hover:bg-base-200"
-						onclick={() => addOpenCall(call.id)}>{call.title}</button
+						onclick={() => addOpenCall(call.id)}>{call.title} · {call.id}</button
 					>
 				{/each}
 			</div>
@@ -1042,7 +1336,7 @@
 					type="button"
 					class="btn btn-sm btn-primary"
 					disabled={!openCallIds.length}
-					onclick={saveOpenCalls}>Insert open calls</button
+					onclick={saveOpenCalls}>Save open calls</button
 				>
 				<button type="button" class="btn btn-sm" onclick={() => (openCallPickerOpen = false)}
 					>Cancel</button
@@ -1056,10 +1350,6 @@
 		aria-labelledby="content-component-editor-title"
 		onkeydown={(event) => {
 			event.stopPropagation();
-			if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
-				event.preventDefault();
-				saveComponentEditor();
-			}
 		}}
 		onclose={() => {
 			componentEditorKind = undefined;
@@ -1075,13 +1365,23 @@
 						? 'Edit logo grid'
 						: componentEditorKind === 'facts'
 							? 'Edit project facts'
-							: 'Edit image'}
+							: componentEditorKind === 'actions'
+								? 'Edit action links'
+								: componentEditorKind === 'callout'
+									? 'Edit callout'
+									: componentEditorKind === 'columns'
+										? 'Edit columns'
+										: componentEditorKind === 'expandable'
+											? 'Edit expandable section'
+											: 'Edit image'}
 			</h2>
-			<p class="mt-1 text-sm opacity-70">Changes are saved only when you select Save.</p>
+			<p class="mt-1 text-sm opacity-70">
+				Save applies this component to your draft. Use Save changes on the page to persist it.
+			</p>
 			{#if componentEditorKind === 'profiles'}
 				<div class="component-form-list">
 					{#each draftProfiles as profile, index (index)}
-						<fieldset class="component-form-card">
+						<fieldset class="component-form-card" disabled={mediaBusy}>
 							<legend>Profile {index + 1}</legend>
 							<div class="component-form-actions">
 								<button
@@ -1102,6 +1402,16 @@
 									onclick={() => removeComponentItem('profiles', index)}>Remove</button
 								>
 							</div>
+							{#if transferBlocks.length}<label
+									>Move to profile block<select
+										class="select w-full"
+										bind:value={profileDestinations[index]}
+										><option value={-1}>Keep in this block</option
+										>{#each transferBlocks as block (block.position)}<option value={block.position}
+												>{block.label}</option
+											>{/each}</select
+									></label
+								>{/if}
 							<label
 								>Name<input
 									class="input-bordered input w-full"
@@ -1124,22 +1434,13 @@
 									bind:value={profile.bio}
 								></textarea></label
 							>
-							<label
-								>Image URL<input
-									class="input-bordered input w-full"
-									type="text"
-									inputmode="url"
-									maxlength="2048"
-									bind:value={profile.image}
-								/></label
-							>
-							<label
-								>Image description<input
-									class="input-bordered input w-full"
-									maxlength="240"
-									bind:value={profile.alt}
-								/></label
-							>
+							<MediaImageField
+								bind:src={profile.image}
+								bind:alt={profile.alt}
+								{uploadImage}
+								libraryEnabled={cmsComponents}
+								bind:busy={mediaBusy}
+							/>
 							<fieldset class="component-link-list">
 								<legend>Links</legend>
 								{#each profile.links as link, linkIndex (linkIndex)}
@@ -1196,13 +1497,13 @@
 				<button
 					type="button"
 					class="btn mt-3 btn-sm"
-					disabled={draftProfiles.length >= maxProfileCards}
+					disabled={mediaBusy || draftProfiles.length >= maxProfileCards}
 					onclick={() => addComponentItem('profiles')}>Add profile</button
 				>
 			{:else if componentEditorKind === 'logos'}
 				<div class="component-form-list">
 					{#each draftLogos as logo, index (index)}
-						<fieldset class="component-form-card">
+						<fieldset class="component-form-card" disabled={mediaBusy}>
 							<legend>Logo {index + 1}</legend>
 							<div class="component-form-actions">
 								<button
@@ -1231,23 +1532,13 @@
 									bind:value={logo.name}
 								/></label
 							>
-							<label
-								>Image URL<input
-									class="input-bordered input w-full"
-									type="text"
-									inputmode="url"
-									maxlength="2048"
-									required
-									bind:value={logo.image}
-								/></label
-							>
-							<label
-								>Image description<input
-									class="input-bordered input w-full"
-									maxlength="240"
-									bind:value={logo.alt}
-								/></label
-							>
+							<MediaImageField
+								bind:src={logo.image}
+								bind:alt={logo.alt}
+								{uploadImage}
+								libraryEnabled={cmsComponents}
+								bind:busy={mediaBusy}
+							/>
 							<label
 								>Link<input
 									class="input-bordered input w-full"
@@ -1263,7 +1554,7 @@
 				<button
 					type="button"
 					class="btn mt-3 btn-sm"
-					disabled={draftLogos.length >= maxLogoItems}
+					disabled={mediaBusy || draftLogos.length >= maxLogoItems}
 					onclick={() => addComponentItem('logos')}>Add logo</button
 				>
 			{:else if componentEditorKind === 'facts'}
@@ -1318,22 +1609,22 @@
 			{:else if componentEditorKind === 'image'}
 				<div class="component-form-list">
 					<label
-						>Image URL<input
-							class="input-bordered input w-full"
-							type="text"
-							inputmode="url"
-							maxlength="2048"
-							required
-							bind:value={draftImage.src}
-						/></label
-					>
-					<label
-						>Image description<input
-							class="input-bordered input w-full"
+						>Image title<input
+							class="input w-full"
 							maxlength="240"
-							bind:value={draftImage.alt}
+							bind:value={draftImageTitle}
 						/></label
 					>
+					<MediaImageField
+						bind:src={draftImage.src}
+						bind:alt={draftImage.alt}
+						{uploadImage}
+						libraryEnabled={cmsComponents}
+						bind:busy={mediaBusy}
+					/>
+					{#if !draftImage.src && componentEditorTarget}<p class="text-sm">
+							Save to remove this image from the document, or Cancel to keep it.
+						</p>{/if}
 					<label
 						>Caption<textarea
 							class="textarea-bordered textarea w-full"
@@ -1342,13 +1633,98 @@
 						></textarea></label
 					>
 				</div>
+			{:else if componentEditorKind === 'actions'}
+				<div class="component-form-list">
+					<div class="flex flex-wrap gap-2">
+						<button
+							type="button"
+							class="btn btn-sm"
+							disabled={!draftActions.secondaryLabel}
+							onclick={() => {
+								draftActions = {
+									primaryLabel: draftActions.secondaryLabel,
+									primaryHref: draftActions.secondaryHref,
+									secondaryLabel: draftActions.primaryLabel,
+									secondaryHref: draftActions.primaryHref
+								};
+							}}>Swap action order</button
+						>
+						<button
+							type="button"
+							class="btn btn-sm"
+							disabled={!draftActions.secondaryLabel && !draftActions.secondaryHref}
+							onclick={() => {
+								draftActions.secondaryLabel = '';
+								draftActions.secondaryHref = '';
+							}}>Remove secondary action</button
+						>
+					</div>
+					<label
+						>Primary action label<input
+							class="input w-full"
+							maxlength="120"
+							bind:value={draftActions.primaryLabel}
+						/></label
+					>
+					<label
+						>Primary action destination<input
+							class="input w-full"
+							maxlength="2048"
+							bind:value={draftActions.primaryHref}
+						/></label
+					>
+					<label
+						>Secondary action label (optional)<input
+							class="input w-full"
+							maxlength="120"
+							bind:value={draftActions.secondaryLabel}
+						/></label
+					>
+					<label
+						>Secondary action destination (optional)<input
+							class="input w-full"
+							maxlength="2048"
+							bind:value={draftActions.secondaryHref}
+						/></label
+					>
+				</div>
+			{:else if componentEditorKind === 'callout'}
+				<label class="mt-3 block"
+					>Callout style<select class="select w-full" bind:value={draftStyle}
+						>{#each calloutStyles as style (style)}<option value={style}>{style}</option
+							>{/each}</select
+					></label
+				>
+				<p class="mt-3 text-sm">Edit the callout text directly in the document.</p>
+			{:else if componentEditorKind === 'columns'}
+				<label class="mt-3 block"
+					>Column count<select class="select w-full" bind:value={draftColumnCount}
+						><option value={2}>2 columns</option><option value={3}>3 columns</option><option
+							value={4}>4 columns</option
+						></select
+					></label
+				>
+				<p class="mt-3 text-sm">
+					Edit text and nested components directly in each column. Reducing the count moves content
+					into the final column without deleting it.
+				</p>
+			{:else if componentEditorKind === 'expandable'}
+				<label class="mt-3 block"
+					>Section title<input class="input w-full" bind:value={draftSummary} /></label
+				>
+				<p class="mt-3 text-sm">Edit the section content directly in the document.</p>
 			{/if}
 			{#if componentEditorError}<p class="mt-3 text-sm text-error" role="alert">
 					{componentEditorError}
 				</p>{/if}
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={closeComponentEditor}>Cancel</button>
-				<button type="button" class="btn btn-primary" onclick={saveComponentEditor}>Save</button>
+				<button
+					type="button"
+					class="btn btn-primary"
+					disabled={mediaBusy}
+					onclick={saveComponentEditor}>Save</button
+				>
 			</div>
 		</div>
 	</dialog>
@@ -1365,6 +1741,7 @@
 		{/if}
 		<div
 			bind:this={element}
+			inert={editionPickerOpen || openCallPickerOpen}
 			class="editor-wrapper prose prose-sm max-w-none p-4 focus-within:outline-none"
 			style:--editor-min-h={minHeight}
 			onpaste={handlePaste}
@@ -1373,6 +1750,52 @@
 </div>
 
 <style>
+	.editor-wrapper :global(.cms-component-node) {
+		min-width: 0;
+		margin: 1rem 0;
+		padding: 0.5rem;
+		border: 1px solid var(--color-base-300);
+		border-radius: var(--radius-box);
+	}
+	.editor-wrapper :global(.cms-component-node.ProseMirror-selectednode) {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
+	}
+	.editor-wrapper :global(.cms-component-controls) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.25rem;
+		margin-bottom: 0.5rem;
+		padding: 0.25rem;
+		border-radius: 0.375rem;
+		background: var(--color-base-200);
+		font-size: 0.75rem;
+	}
+	.editor-wrapper :global(.cms-component-controls strong) {
+		margin-right: auto;
+		padding: 0.25rem;
+	}
+	.editor-wrapper :global(.cms-component-controls button) {
+		min-height: 2rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid var(--color-base-300);
+		border-radius: 0.375rem;
+		background: var(--color-base-100);
+		color: var(--color-base-content);
+		cursor: pointer;
+	}
+	.editor-wrapper :global(.cms-component-controls button:hover:not(:disabled)) {
+		background: var(--color-base-300);
+	}
+	.editor-wrapper :global(.cms-component-controls button:focus-visible) {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
+	}
+	.editor-wrapper :global(.cms-component-controls button:disabled) {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
 	.editor-toolbar {
 		display: flex;
 		flex-wrap: wrap;
