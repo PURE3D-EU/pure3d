@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.0 - 2026-11-03
+
+### Features
+
+- add self-hosted Kompakkt edition viewer (4e08e784)
+
 ## v2.1.2 - 2026-11-02
 
 ### Fixes
