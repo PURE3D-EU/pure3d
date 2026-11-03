@@ -1,0 +1,51 @@
+  // Pure3D modification to Kompakkt Viewer, distributed with its AGPL-3.0 source.
+  private installPure3dBridge() {
+    const params = new URLSearchParams(location.search);
+    if (!params.has('standalone') || !params.get('resource') || window.parent === window) return;
+    const initial = new URL(params.get('resource')!, location.href);
+    const directory = new URL('.', initial);
+    let ready = false;
+    let busy = false;
+    let pending: { resource: string; requestId: number } | undefined;
+    const send = (data: object) => window.parent.postMessage(data, location.origin);
+    const drain = async () => {
+      if (!ready || busy) return;
+      busy = true;
+      try {
+        while (pending) {
+          const next = pending;
+          pending = undefined;
+          try {
+            await this.loadStandaloneEntity({ standalone: 'true', resource: next.resource, minimal: 'true' });
+            await new Promise<void>(resolve => this.babylon.getScene().onAfterRenderObservable.addOnce(() => resolve()));
+            send({ type: 'pure3d:kompakkt:loaded', ...next });
+          } catch {
+            send({ type: 'pure3d:kompakkt:error', requestId: next.requestId });
+          }
+        }
+      } finally {
+        busy = false;
+      }
+    };
+    window.addEventListener('message', event => {
+      if (event.origin !== location.origin || event.source !== window.parent) return;
+      const data = event.data;
+      if (!data || data.type !== 'pure3d:kompakkt:load' ||
+          !Number.isSafeInteger(data.requestId) || data.requestId < 1 ||
+          typeof data.resource !== 'string' || data.resource.length > 8192) return;
+      try {
+        const resource = new URL(data.resource);
+        if (resource.origin !== directory.origin || !resource.pathname.startsWith(directory.pathname) ||
+            resource.username || resource.password || resource.search || resource.hash ||
+            !/\.(glb|gltf)$/i.test(resource.pathname)) return;
+        pending = { resource: resource.href, requestId: data.requestId };
+        void drain();
+      } catch { /* Ignore malformed or out-of-scope messages. */ }
+    });
+    effect(() => {
+      if (!this.bootstrapped() || ready) return;
+      ready = true;
+      send({ type: 'pure3d:kompakkt:ready', resource: initial.href });
+      void untracked(drain);
+    });
+  }

@@ -31,6 +31,7 @@ src/lib/paraglide
 pocketbase/pb_data
 data
 static/project
+/static/kompakkt/
 # Voyager: only commit production-minified files
 static/voyager/**/*.dev.*
 static/voyager/**/*.map

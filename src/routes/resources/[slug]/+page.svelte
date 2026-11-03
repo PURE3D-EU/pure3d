@@ -80,7 +80,7 @@
 		</div>
 	</header>
 	<div class="mx-auto max-w-7xl px-5 md:px-10">
-		{#if item.coverUrl}<img
+		{#if item.kind !== 'post' && item.coverUrl}<img
 				class="mt-10 max-h-[560px] w-full rounded-lg bg-base-200 object-contain"
 				src={localContentAssetUrl(item.coverUrl)}
 				alt=""

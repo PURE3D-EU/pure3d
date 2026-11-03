@@ -239,42 +239,51 @@
 			onclose={exitEditor}
 		/>{/if}
 	<div class="mx-auto max-w-7xl">
-		<div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+		<details class="footer-navigation" open={editing}>
+			<summary>
+				<span>Explore PURE3D</span>
+				<span class="footer-toggle" aria-hidden="true"></span>
+			</summary>
+			<div class="grid gap-8 pt-8 sm:grid-cols-2 lg:grid-cols-4">
 			{#each items as item (item.id)}<section>
-					<h2 class="mb-4 text-sm font-semibold">
-						{#if item.landing}<a class="section-link" href={href(item.landing.href)}
-								>{item.label} <span aria-hidden="true">↗</span></a
-							>{:else}{item.label}{/if}
-					</h2>
-					{#if item.direct}<a class="text-sm underline" href={href(item.direct.href)}
-							>{item.direct.label}</a
-						>{:else}{#each item.groups as group (group.id)}
-							{@const headingLink = groupHeadingLink(group)}
-							{@const listedLinks = group.links.filter((link) => link.id !== headingLink?.id)}
-							<div class="mb-5">
-								<h3 class="mb-2 text-xs opacity-60">
-									{#if headingLink}<a class="group-link" href={href(headingLink.href)}
-											>{group.label} <span aria-hidden="true">↗</span></a
-										>{:else}{group.label}{/if}
-								</h3>
-								{#if listedLinks.length}<ul class="space-y-2 text-sm">
-										{#each listedLinks as link (link.id)}<li>
-												<a class="hover:underline" href={href(link.href)}>{link.label}</a>
-											</li>{/each}
-									</ul>{/if}
-							</div>
-						{/each}{/if}
-					{#if item.featured}<aside class="mt-4 rounded-lg border border-base-300 p-4">
-							<p class="text-xs opacity-60">{item.featured.kicker}</p>
-							<p class="my-3 text-2xl tracking-widest">{item.featured.artwork}</p>
-							<h3 class="font-semibold">{item.featured.title}</h3>
-							<p class="my-2 text-sm opacity-60">{item.featured.description}</p>
-							<a class="text-sm underline" href={href(item.featured.link.href)}
-								>{item.featured.link.label}</a
-							>
-						</aside>{/if}
+					<h2 class="text-sm font-semibold">{item.label}</h2>
+					<div class="pt-4">
+						{#if item.landing}<a
+								class="section-link mb-4 inline-block text-sm"
+								href={href(item.landing.href)}
+								>{item.landing.label} <span aria-hidden="true">↗</span></a
+							>{/if}
+						{#if item.direct}<a class="text-sm underline" href={href(item.direct.href)}
+								>{item.direct.label}</a
+							>{:else}{#each item.groups as group (group.id)}
+								{@const headingLink = groupHeadingLink(group)}
+								{@const listedLinks = group.links.filter((link) => link.id !== headingLink?.id)}
+								<div class="mb-5">
+									<h3 class="mb-2 text-xs opacity-60">
+										{#if headingLink}<a class="group-link" href={href(headingLink.href)}
+												>{group.label} <span aria-hidden="true">↗</span></a
+											>{:else}{group.label}{/if}
+									</h3>
+									{#if listedLinks.length}<ul class="space-y-2 text-sm">
+											{#each listedLinks as link (link.id)}<li>
+													<a class="hover:underline" href={href(link.href)}>{link.label}</a>
+												</li>{/each}
+										</ul>{/if}
+								</div>
+							{/each}{/if}
+						{#if item.featured}<aside class="mt-4 rounded-lg border border-base-300 p-4">
+								<p class="text-xs opacity-60">{item.featured.kicker}</p>
+								<p class="my-3 text-2xl tracking-widest">{item.featured.artwork}</p>
+								<h3 class="font-semibold">{item.featured.title}</h3>
+								<p class="my-2 text-sm opacity-60">{item.featured.description}</p>
+								<a class="text-sm underline" href={href(item.featured.link.href)}
+									>{item.featured.link.label}</a
+								>
+							</aside>{/if}
+					</div>
 				</section>{/each}
-		</div>
+			</div>
+		</details>
 		<div
 			class="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-base-300 pt-6 text-sm"
 		>
@@ -294,6 +303,35 @@
 </footer>
 
 <style>
+	#site-footer {
+		/* Keep footer actions above the fixed feedback button, including on phones. */
+		padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+	}
+	.footer-navigation > summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 48px;
+		cursor: pointer;
+		list-style: none;
+		font-size: 1rem;
+		font-weight: 600;
+	}
+	.footer-navigation > summary::-webkit-details-marker {
+		display: none;
+	}
+	.footer-navigation > summary:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 4px;
+	}
+	.footer-toggle::before {
+		content: '+';
+		font-size: 1.5rem;
+		font-weight: 400;
+	}
+	.footer-navigation[open] .footer-toggle::before {
+		content: '−';
+	}
 	a {
 		overflow-wrap: anywhere;
 	}

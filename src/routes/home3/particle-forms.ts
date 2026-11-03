@@ -62,6 +62,14 @@ export const EDITION_PARTICLE_FORMS: ParticleForm[] = [
 		sourceTitle: 'Muffin’s Journey'
 	},
 	{
+		id: 'bolex',
+		label: 'Bolex',
+		title: 'Bolex L8 Double 8mm Cine Film Camera',
+		note: 'Surface points sampled from the published camera mesh, excluding documentary images and comparison models.',
+		sourceSlug: 'a85366846edebc1',
+		sourceTitle: 'Bolex L8'
+	},
+	{
 		id: 'duwelsteene',
 		label: '3D Düwelsteene',
 		title: '3D Düwelsteene',

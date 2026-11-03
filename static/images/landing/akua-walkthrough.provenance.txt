@@ -1,0 +1,19 @@
+Akua’ba child figure: real-edition walkthrough
+
+Source edition: https://pure3d.eu/editions/4ze4q66v8wbs87n
+Creator: Hilde Janssen, Museum van Bommel van Dam
+Licence displayed by the edition: CC BY-NC 4.0
+
+Captured 3 November 2026 from the anonymous local preview of this published edition, using
+production read-only assets. Source mesh, annotations and interpretation were not changed.
+
+akua-object.webp: close-up of the actual figure, cropped from the public Voyager viewer.
+akua-annotated.webp: actual public Voyager viewer with the “Eyebrows” annotation selected and
+its “A beautiful child I” article open. This is a reader view, not an authoring-session capture.
+akua-published.webp: the public edition title, viewer and edition-record panel.
+
+Screenshots were cropped and encoded as WebP. No model geometry, annotation text, review
+decisions or publication claims were invented. The source edition is linked beside the imagery.
+
+Framing was informed by Stageshow’s static-card example: one dominant real product view,
+meaningful crops and restrained surrounding chrome. No upstream code or assets were copied.

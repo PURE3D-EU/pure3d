@@ -1,0 +1,15 @@
+Bolex L8 particle cloud
+
+PURE3D record: a85366846edebc1 (collection 24, edition 1)
+Source scene: https://api.pure3d.eu/assets/project/24/edition/1/scene.svx.json
+Source mesh: model_bolex-L8_thumb.glb (model 1, Web3D Thumb derivative)
+Creators: Emil Rieken; Gaja Carlotta Ghiringhelli; Tara Grebe
+Rights holder: Maastricht University
+Licence: no licence value supplied by the edition record; no new licence asserted.
+
+Method: scripts/sample-edition-particles.ts, --model 1 (default yaw 90).
+18,000 deterministic area-weighted surface samples from 200,000 triangles.
+Embedded GLB and Voyager model/node transforms applied, fitted and quantised to int16 xyz.
+Only the camera is sampled; documentary images, comparison objects and AI models are excluded.
+Original mesh and textures are not redistributed.
+Orange highlights are conceptual, not source annotation coordinates.

@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Pure3D database backup at 02:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+Persistent=true
+Unit=pure3d-database-backup.service
+
+[Install]
+WantedBy=timers.target

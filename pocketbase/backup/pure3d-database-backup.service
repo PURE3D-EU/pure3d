@@ -1,0 +1,17 @@
+[Unit]
+Description=Verified Pure3D PocketBase database-only backup
+RequiresMountsFor=/opt/pure3d-archive/platform/pocketbase/pb_data /var/backups
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/local/sbin/pure3d-database-backup
+TimeoutStartSec=25min
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/pure3d-database

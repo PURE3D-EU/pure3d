@@ -75,31 +75,36 @@
 		return { destroy: () => observer.disconnect() };
 	}
 
+	let storyIndex = $state(0);
 	const storySteps = [
 		{
 			kicker: 'Conceptualise',
 			title: 'Build the narrative.',
 			description: 'A 3D scholarly edition begins with a model and a story to tell.',
-			image: '/images/landing/capture.webp',
-			alt: 'Wireframe study for conceptualising a 3D scholarly edition'
+			image: '/images/landing/akua-object.webp',
+			alt: 'Close-up of the wooden Akua’ba child figure in the published 3D edition',
+			caption: 'Begin with an object and a question.'
 		},
 		{
 			kicker: 'Implement',
-			title: 'Create the edition.',
+			title: 'Author using interface.',
 			description:
 				'Harnessing the affordances of interface, curate an interactive experience that details model sources, evidence and interpretation.',
-			image: '/images/landing/annotate.webp',
-			alt: 'Wireframe study for authoring a 3D scholarly edition'
+			image: '/images/landing/akua-annotated.webp',
+			alt: 'The real Akua’ba edition with an eyebrow annotation and its supporting interpretation open',
+			caption: 'Connect the model to its interpretation.'
 		},
 		{
 			kicker: 'Publish',
 			title: 'Revise from feedback.',
 			description:
 				'The two stage review process collects input on the technical and conceptual implementation.',
-			image: '/images/landing/review.webp',
-			alt: 'Wireframe study for revising a 3D scholarly edition after review'
+			image: '/images/landing/akua-published.webp',
+			alt: 'The published Akua’ba child figure edition with its 3D viewer, description and edition record',
+			caption: 'Bring the research together in an edition.'
 		}
 	];
+	const selectedStory = $derived(storySteps[storyIndex]);
 	const workflow = ['Proposal', 'Proposal review', 'Alpha review', 'Final review', 'Publication'];
 	const promiseCards = [
 		{
@@ -129,7 +134,7 @@
 		{
 			name: 'NWO',
 			href: 'https://www.nwo.nl',
-			image: '/images/landing/supporters/nwo.png'
+			image: '/images/landing/supporters/nwo-mark.png'
 		},
 		{
 			name: 'Open Science NL',
@@ -220,6 +225,7 @@
 	</section>
 
 	<HomeOpenCalls />
+	{@render latestNews()}
 
 	<section class="evidence" aria-labelledby="home3-evidence">
 		<div class="shell">
@@ -233,18 +239,50 @@
 				</div>
 				{@render catalogueStats()}
 			</header>
-			<ol class="plates">
-				{#each storySteps as step, i (step.kicker)}
-					<li class="plate" use:reveal={i * 140}>
-						<img src={`${base}${step.image}`} alt={step.alt} loading="lazy" decoding="async" />
-						<div>
-							<span class="kicker">{step.kicker}</span>
-							<h3>{step.title}</h3>
-							<p>{step.description}</p>
-						</div>
-					</li>
-				{/each}
-			</ol>
+			<div class="edition-story" use:reveal>
+				<figure class="story-media" id="home3-story-media">
+					<div class="story-image">
+						{#each storySteps as step, i (step.kicker)}
+							<img
+								src={`${base}${step.image}`}
+								alt={step.alt}
+								hidden={storyIndex !== i}
+								loading="lazy"
+								decoding="async"
+							/>
+						{/each}
+					</div>
+					<figcaption aria-live="polite">
+						<span>{selectedStory.caption}</span>
+						<a href={resolve('/editions/[slug]', { slug: '4ze4q66v8wbs87n' })}>
+							Akua’ba child figure <span aria-hidden="true">↗</span>
+						</a>
+					</figcaption>
+				</figure>
+				<ol class="story-steps" aria-label="Explore the three stages of an edition">
+					{#each storySteps as step, i (step.kicker)}
+						<li>
+							<button
+								type="button"
+								aria-pressed={storyIndex === i}
+								aria-controls="home3-story-media"
+								onclick={() => (storyIndex = i)}
+							>
+								<span class="story-step-head">
+									<span class="kicker">0{i + 1} / {step.kicker}</span>
+									<span class="story-arrow" aria-hidden="true">↗</span>
+								</span>
+								<span class="story-title">{step.title}</span>
+								<span class="story-description">{step.description}</span>
+							</button>
+						</li>
+					{/each}
+				</ol>
+				<div class="story-mobile-copy">
+					<h3>{selectedStory.title}</h3>
+					<p>{selectedStory.description}</p>
+				</div>
+			</div>
 		</div>
 	</section>
 
@@ -323,44 +361,50 @@
 		</div>
 	</section>
 
-	<section class="news" aria-labelledby="home3-news">
-		<div class="shell">
-			<header class="section-head split" use:reveal>
-				<div>
-					<h2 id="home3-news">Latest news</h2>
-					<p class="section-sub">Calls, workshops and announcements from the PURE3D community.</p>
-				</div>
-				<a class="more" href={resolve('/resources')}>All news <span aria-hidden="true">↗</span></a>
-			</header>
-			{#if news.length > 0}
-				<div class="news-grid">
-					{#each news as item, i (item.id)}
-						<article class="news-card" use:reveal={i * 80}>
-							{#if item.publishedAt}
-								<time datetime={item.publishedAt}>
-									{new Date(item.publishedAt).toLocaleDateString('en-GB', {
-										day: 'numeric',
-										month: 'long',
-										year: 'numeric'
-									})}
-								</time>
-							{/if}
-							<h3><a href={resolve('/resources/[slug]', { slug: item.slug })}>{item.title}</a></h3>
-							{#if item.summary}<p>{item.summary}</p>{/if}
-							<a class="more" href={resolve('/resources/[slug]', { slug: item.slug })}>
-								Read more <span aria-hidden="true">→</span>
-							</a>
-						</article>
-					{/each}
-				</div>
-			{:else if newsLoading}
-				<div class="news-grid" aria-hidden="true">
-					<div class="news-placeholder"></div>
-					<div class="news-placeholder"></div>
-				</div>
-			{/if}
-		</div>
-	</section>
+	{#snippet latestNews()}
+		<section class="news" aria-labelledby="home3-news">
+			<div class="shell">
+				<header class="section-head split" use:reveal>
+					<div>
+						<h2 id="home3-news">Latest news</h2>
+						<p class="section-sub">Calls, workshops and announcements from the PURE3D community.</p>
+					</div>
+					<a class="more" href={resolve('/resources')}
+						>All news <span aria-hidden="true">↗</span></a
+					>
+				</header>
+				{#if news.length > 0}
+					<div class="news-grid">
+						{#each news as item, i (item.id)}
+							<article class="news-card" use:reveal={i * 80}>
+								{#if item.publishedAt}
+									<time datetime={item.publishedAt}>
+										{new Date(item.publishedAt).toLocaleDateString('en-GB', {
+											day: 'numeric',
+											month: 'long',
+											year: 'numeric'
+										})}
+									</time>
+								{/if}
+								<h3>
+									<a href={resolve('/resources/[slug]', { slug: item.slug })}>{item.title}</a>
+								</h3>
+								{#if item.summary}<p>{item.summary}</p>{/if}
+								<a class="more" href={resolve('/resources/[slug]', { slug: item.slug })}>
+									Read more <span aria-hidden="true">→</span>
+								</a>
+							</article>
+						{/each}
+					</div>
+				{:else if newsLoading}
+					<div class="news-grid" aria-hidden="true">
+						<div class="news-placeholder"></div>
+						<div class="news-placeholder"></div>
+					</div>
+				{/if}
+			</div>
+		</section>
+	{/snippet}
 
 	<section class="call" aria-labelledby="home3-call">
 		<div class="shell">
@@ -371,13 +415,16 @@
 				<div>
 					<p>
 						PURE3D provides the infrastructure and tools to publish interactive 3D research. Join
-						our growing community edition editors/authors.
+						our growing community of edition authors.
 					</p>
 					<div class="actions">
 						<a href={resolve('/documentation')} class="button button-primary">
 							Get started <span aria-hidden="true">→</span>
 						</a>
-						<a href={resolve('/resources/[slug]', { slug: 'calls' })} class="button button-on-ink">
+						<a
+							href={resolve('/documentation/[slug]', { slug: 'calls' })}
+							class="button button-on-ink"
+						>
 							Open calls
 						</a>
 					</div>
@@ -393,7 +440,12 @@
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				{#each partnerLogos as partner, i (partner.name)}
 					<li use:reveal={i * 80}>
-						<a href={partner.href} target="_blank" rel="noreferrer">
+						<a
+							href={partner.href}
+							class:nwo-partner={partner.name === 'NWO'}
+							target="_blank"
+							rel="noreferrer"
+						>
 							<img src={`${base}${partner.image}`} alt={partner.name} loading="lazy" />
 						</a>
 					</li>
@@ -661,46 +713,97 @@
 		color: var(--color-vermillion-ink);
 	}
 
-	/* ---------- evidence plates ---------- */
-	.plates {
+	/* ---------- real-edition walkthrough ---------- */
+	.edition-story {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 16px;
+		grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+		align-items: start;
+		gap: 40px;
+	}
+	.story-media {
+		margin: 0;
+	}
+	.story-image {
+		aspect-ratio: 4 / 3;
+		overflow: hidden;
+		border-radius: var(--radius-surface);
+		background: var(--color-paper-2);
+	}
+	.story-image img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.story-image img[hidden] {
+		display: none;
+	}
+	.story-media figcaption {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 8px 24px;
+		padding-top: 16px;
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--color-ink-3);
+	}
+	.story-media figcaption a {
+		color: var(--color-ink-2);
+		text-underline-offset: 4px;
+	}
+	.story-steps {
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
-	.plate {
-		display: grid;
-		grid-template-rows: auto 1fr;
-		overflow: hidden;
-		border: 1px solid var(--rule);
-		border-radius: var(--radius-surface);
-		background: var(--color-paper);
+	.story-steps li + li {
+		border-top: 1px solid var(--rule);
 	}
-	.plate img {
-		width: 100%;
-		aspect-ratio: 4 / 3;
-		object-fit: contain;
-		background: var(--color-paper-2);
-		border-bottom: 1px solid var(--rule);
-	}
-	.plate > div {
+	.story-steps button {
 		display: grid;
-		align-content: start;
 		gap: 12px;
-		padding: clamp(20px, 2.4vw, 32px);
+		width: 100%;
+		padding: 24px;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
 	}
-	.plate h3 {
-		font-size: clamp(22px, 2.2vw, 30px);
+	.story-steps button:hover,
+	.story-steps button[aria-pressed='true'] {
+		background: var(--color-paper-2);
+	}
+	.story-step-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+	}
+	.story-arrow {
+		color: var(--color-ink-3);
+		opacity: 0;
+	}
+	.story-steps button[aria-pressed='true'] .story-arrow,
+	.story-steps button:hover .story-arrow,
+	.story-steps button:focus-visible .story-arrow {
+		opacity: 1;
+	}
+	.story-title {
+		font-size: 24px;
+		font-weight: 500;
 		line-height: 1.08;
+		letter-spacing: -0.02em;
 	}
-	.plate p {
-		margin: 0;
+	.story-description {
 		font-family: var(--font-serif);
-		font-size: 17px;
+		font-size: 16px;
 		line-height: 1.5;
 		color: var(--color-ink-3);
+	}
+	.story-mobile-copy {
+		display: none;
 	}
 
 	/* ---------- workflow track ---------- */
@@ -949,6 +1052,12 @@
 		max-height: 48px;
 		object-fit: contain;
 	}
+	.partner-list a.nwo-partner {
+		padding: 14px;
+	}
+	.partner-list .nwo-partner img {
+		max-height: 60px;
+	}
 	/* ---------- motion ---------- */
 	@media (prefers-reduced-motion: no-preference) {
 		.rise {
@@ -1011,18 +1120,47 @@
 		.call-plate {
 			grid-template-columns: 1fr;
 		}
-		.plates,
+		.edition-story,
 		.promise-grid {
 			grid-template-columns: 1fr;
 		}
-		.plate {
-			grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-			grid-template-rows: none;
+		.edition-story {
+			gap: 24px;
 		}
-		.plate img {
+		.story-steps {
+			order: -1;
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			border-bottom: 1px solid var(--rule);
+		}
+		.story-steps li + li {
+			border-top: 0;
+		}
+		.story-steps button {
 			height: 100%;
-			border-right: 1px solid var(--rule);
-			border-bottom: 0;
+			padding: 16px;
+			align-content: start;
+		}
+		.story-steps .story-title {
+			font-size: 20px;
+		}
+		.story-description,
+		.story-arrow {
+			display: none;
+		}
+		.story-mobile-copy {
+			display: grid;
+			gap: 12px;
+		}
+		.story-mobile-copy h3 {
+			font-size: 24px;
+		}
+		.story-mobile-copy p {
+			margin: 0;
+			font-family: var(--font-serif);
+			font-size: 17px;
+			line-height: 1.5;
+			color: var(--color-ink-3);
 		}
 		.promise {
 			min-height: 0;
@@ -1042,12 +1180,14 @@
 		.news-grid {
 			grid-template-columns: 1fr;
 		}
-		.plate {
-			grid-template-columns: 1fr;
+		.story-steps .story-title {
+			display: none;
 		}
-		.plate img {
-			border-right: 0;
-			border-bottom: 1px solid var(--rule);
+		.story-steps button {
+			padding: 16px 8px;
+		}
+		.story-steps .kicker {
+			font-size: 10px;
 		}
 		.track {
 			grid-template-columns: 1fr;

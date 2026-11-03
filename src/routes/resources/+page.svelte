@@ -28,9 +28,7 @@
 	}
 	let loadedImages = $state<Record<string, boolean>>({});
 	let failedImages = $state<Record<string, boolean>>({});
-	let latestId = $derived(
-		data.items.find((item) => item.isPublished && item.publishedAt)?.id
-	);
+	let latestId = $derived(data.items.find((item) => item.isPublished && item.publishedAt)?.id);
 	let items = $derived(
 		data.items.filter((item) =>
 			`${item.title} ${item.summary}`.toLowerCase().includes(query.toLowerCase())
@@ -43,16 +41,24 @@
 </script>
 
 <svelte:head
-	><title>{data.categoryName || 'Resources'} | PURE3D</title><meta
+	><title>{data.categoryName || 'Activities & Outputs'} | PURE3D</title><meta
 		name="description"
 		content="Explore research, publications, tutorials and stories from the PURE3D community."
 	/></svelte:head
 >
 <main id="resources-page" class="mx-auto max-w-7xl px-5 py-6 md:px-10">
-	<h1 class="sr-only">{data.categoryName || 'Activities & Outputs'}</h1>
+	<header class="mb-8 max-w-3xl">
+		<h1 class="text-4xl font-bold tracking-tight">{data.categoryName || 'Activities & Outputs'}</h1>
+		<p class="mt-4 text-lg text-base-content/70">
+			Learn from the research, explore new perspectives and get inspired by the community.
+		</p>
+	</header>
 	<div class="resource-toolbar mb-9 border-y border-base-300">
 		<nav class="resource-tabs" aria-label="Resource categories">
-			<a class:active={!data.category} aria-current={!data.category ? 'page' : undefined} href={resolve('/resources')}>Activities &amp; Updates</a
+			<a
+				class:active={!data.category}
+				aria-current={!data.category ? 'page' : undefined}
+				href={resolve('/resources')}>Activities &amp; Updates</a
 			>{#each data.categories as category (category.id)}<a
 					class:active={data.category === category.id}
 					aria-current={data.category === category.id ? 'page' : undefined}
@@ -60,43 +66,68 @@
 				>{/each}
 		</nav>
 		<div class="resource-controls">
-		<label class="input resource-search"
-			><span class="sr-only">Search resources</span><input
-				type="search"
-				placeholder="Search resources…"
-				bind:value={query}
-			/></label
-		>
-		<div class="join shrink-0" role="group" aria-label="Content view">
-			<button
-				type="button"
-				class="btn btn-sm join-item"
-				class:btn-active={view === 'grid'}
-				aria-pressed={view === 'grid'}
-				onclick={() => setView('grid')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-					<rect x="3" y="3" width="7" height="7" rx="1" />
-					<rect x="14" y="3" width="7" height="7" rx="1" />
-					<rect x="3" y="14" width="7" height="7" rx="1" />
-					<rect x="14" y="14" width="7" height="7" rx="1" />
-				</svg>
-				Grid</button
+			<label class="resource-search input"
+				><span class="sr-only">Search resources</span><input
+					type="search"
+					placeholder="Search resources…"
+					bind:value={query}
+				/></label
 			>
-			<button
-				type="button"
-				class="btn btn-sm join-item"
-				class:btn-active={view === 'list'}
-				aria-pressed={view === 'list'}
-				onclick={() => setView('list')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
-					<path d="M9 5h12M9 12h12M9 19h12M3 5h1M3 12h1M3 19h1" />
-				</svg>
-				List</button
-			>
-		</div>
+			<div class="join shrink-0" role="group" aria-label="Content view">
+				<button
+					type="button"
+					class="btn join-item btn-sm"
+					class:btn-active={view === 'grid'}
+					aria-pressed={view === 'grid'}
+					onclick={() => setView('grid')}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.75"
+						aria-hidden="true"
+					>
+						<rect x="3" y="3" width="7" height="7" rx="1" />
+						<rect x="14" y="3" width="7" height="7" rx="1" />
+						<rect x="3" y="14" width="7" height="7" rx="1" />
+						<rect x="14" y="14" width="7" height="7" rx="1" />
+					</svg>
+					Grid</button
+				>
+				<button
+					type="button"
+					class="btn join-item btn-sm"
+					class:btn-active={view === 'list'}
+					aria-pressed={view === 'list'}
+					onclick={() => setView('list')}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.75"
+						stroke-linecap="round"
+						aria-hidden="true"
+					>
+						<path d="M9 5h12M9 12h12M9 19h12M3 5h1M3 12h1M3 19h1" />
+					</svg>
+					List</button
+				>
+			</div>
 		</div>
 	</div>
-	<div class={view === 'grid' ? 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'resource-list'}>
+	<div
+		class={view === 'grid'
+			? 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+			: 'resource-list'}
+	>
 		{#each displayItems as item, index (item.id)}{@const imageSources = item.coverUrl
 				? getCardImageSources(localContentAssetUrl(item.coverUrl))
 				: null}<a
@@ -119,8 +150,8 @@
 							sizes={item.id === latestId
 								? '(min-width: 768px) 40vw, 100vw'
 								: view === 'list'
-								? '(min-width: 640px) 160px, 88px'
-								: '(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw'}
+									? '(min-width: 640px) 160px, 88px'
+									: '(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw'}
 							alt=""
 							loading={index < 3 ? 'eager' : 'lazy'}
 							fetchpriority={index < 3 ? 'high' : 'auto'}
@@ -135,7 +166,10 @@
 							PURE3D
 						</div>{/if}
 					{#if !item.isPublished}
-						<span class="absolute inset-x-0 top-0 bg-warning px-3 py-1 text-center text-xs font-semibold text-warning-content">Draft</span>
+						<span
+							class="absolute inset-x-0 top-0 bg-warning px-3 py-1 text-center text-xs font-semibold text-warning-content"
+							>Draft</span
+						>
 					{/if}
 				</div>
 				<div class="resource-copy p-6">
@@ -145,8 +179,12 @@
 							.map((c) => c.name)
 							.join(' · ') || kindLabels[item.kind]}
 					</p>
-					<h2 class="resource-title text-xl leading-snug font-semibold group-hover:underline">{item.title}</h2>
-					<p class="resource-summary mt-3 line-clamp-3 text-sm leading-relaxed opacity-65">{item.summary}</p>
+					<h2 class="resource-title text-xl leading-snug font-semibold group-hover:underline">
+						{item.title}
+					</h2>
+					<p class="resource-summary mt-3 line-clamp-3 text-sm leading-relaxed opacity-65">
+						{item.summary}
+					</p>
 					<p class="resource-date mt-6 text-xs opacity-50">
 						{item.publishedAt
 							? new Date(item.publishedAt).toLocaleDateString('en-GB', {

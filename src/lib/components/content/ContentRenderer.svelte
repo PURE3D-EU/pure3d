@@ -335,6 +335,9 @@
 		margin-inline: auto;
 		object-fit: contain;
 	}
+	#content-renderer.imported :global([data-cms-profile] > img) {
+		object-fit: cover;
+	}
 	#content-renderer.imported :global(img:has(+ img)),
 	#content-renderer.imported :global(img + img) {
 		display: inline-block;

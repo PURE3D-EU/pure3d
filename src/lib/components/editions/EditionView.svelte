@@ -15,10 +15,10 @@
 	import EditionStories from '$lib/components/voyager/EditionStories.svelte';
 	import EditionMetadata from '$lib/components/editions/EditionMetadata.svelte';
 	import OriginalEditionViewer from '$lib/components/voyager/OriginalEditionViewer.svelte';
+	import KompakktViewer from '$lib/components/kompakkt/KompakktViewer.svelte';
 	import {
 		canPreviewEditionViewer,
-		editionViewerPreferenceKey,
-		useExperimentalEditionViewer
+		editionViewerPreferenceKey
 	} from '$lib/components/voyager/edition-viewer-experiment';
 	import { cachePrefix } from '$lib/database/client';
 	import { getEditionCoverUrl } from '$lib/utils/asset-urls';
@@ -65,40 +65,42 @@
 
 	let { data, embedded = false }: { data: EditionViewData; embedded?: boolean } = $props();
 	let previewOwner = $state<string | null>(null);
-	let previewEnabled = $state(false);
+	type ViewerChoice = 'original' | 'experimental' | 'kompakkt';
+	let viewerPreference = $state<ViewerChoice>('original');
 	const canPreview = $derived(canPreviewEditionViewer(authStore.globalRole, authStore.appUserId));
-	const useExperimentalLayout = $derived(
-		useExperimentalEditionViewer(
-			authStore.globalRole,
-			authStore.appUserId,
-			previewOwner,
-			previewEnabled
-		)
+	const selectedViewer = $derived(
+		canPreview && authStore.appUserId === previewOwner ? viewerPreference : 'original'
 	);
+	const useExperimentalLayout = $derived(selectedViewer === 'experimental');
+	const useKompakkt = $derived(selectedViewer === 'kompakkt');
 
 	$effect(() => {
 		const owner = canPreview ? authStore.appUserId : null;
 		previewOwner = null;
-		previewEnabled = false;
+		viewerPreference = 'original';
 		if (!owner) return;
 		try {
-			previewEnabled =
-				localStorage.getItem(editionViewerPreferenceKey(cachePrefix, owner)) === 'experimental';
+			const saved = localStorage.getItem(editionViewerPreferenceKey(cachePrefix, owner));
+			if (saved === 'experimental' || saved === 'kompakkt') viewerPreference = saved;
 		} catch {
 			// Browser storage is optional; the preview still works for the current page.
 		}
 		previewOwner = owner;
 	});
 
-	function setViewerExperiment(enabled: boolean) {
+	function selectViewer(viewer: ViewerChoice) {
 		const owner = authStore.appUserId;
 		if (!canPreview || !owner) return;
+		voyagerAPI?.stopTour();
+		voyagerAPI = null;
+		activeVoyagerPanel = null;
+		isFullWindow = false;
 		previewOwner = owner;
-		previewEnabled = enabled;
+		viewerPreference = viewer;
 		try {
 			localStorage.setItem(
 				editionViewerPreferenceKey(cachePrefix, owner),
-				enabled ? 'experimental' : 'original'
+				viewer
 			);
 		} catch {
 			// Do not let restricted storage prevent switching layouts.
@@ -347,6 +349,7 @@
 	}
 
 	function handleViewerReady(api: VoyagerAPI) {
+		if (useKompakkt) return;
 		voyagerAPI = api;
 		activeVoyagerPanel = null;
 		if (!useExperimentalLayout) return;
@@ -461,7 +464,7 @@
 
 	$effect(() => {
 		void edition.id;
-		void useExperimentalLayout;
+		void selectedViewer;
 		isFullWindow = false;
 		isSidebarCollapsed = false;
 		loadedScene = null;
@@ -480,9 +483,10 @@
 	$effect(() => {
 		void sceneReload;
 		void edition.id;
+		void selectedViewer;
 		const root = edition.voyagerRoot;
 		const document = edition.sceneFile || 'scene.svx.json';
-		if (!root || !needsPreparedScene) {
+		if (useKompakkt || !root || !needsPreparedScene) {
 			sceneLoading = false;
 			return;
 		}
@@ -645,18 +649,23 @@
 						class="edition-viewer-switch ml-auto shrink-0"
 						title="Admin-only viewer preview"
 					>
-						<legend class="sr-only">Viewer layout · admin preview</legend>
-						<div role="group" aria-label="Viewer layout">
+						<legend class="sr-only">Viewer · admin preview</legend>
+						<div role="group" aria-label="Viewer">
 							<button
 								type="button"
-								aria-pressed={!useExperimentalLayout}
-								onclick={() => setViewerExperiment(false)}>Original</button
+								aria-pressed={selectedViewer === 'original'}
+								onclick={() => selectViewer('original')}>Original</button
 							>
 							<button
 								type="button"
 								aria-pressed={useExperimentalLayout}
-								onclick={() => setViewerExperiment(true)}
+								onclick={() => selectViewer('experimental')}
 								><FlaskConicalIcon class="h-3.5 w-3.5" aria-hidden="true" />Experimental</button
+							>
+							<button
+								type="button"
+								aria-pressed={useKompakkt}
+								onclick={() => selectViewer('kompakkt')}>Kompakkt</button
 							>
 						</div>
 					</fieldset>
@@ -728,8 +737,10 @@
 					class="ds-card-frame viewer-frame p-3 transition-all duration-300"
 					class:full-window-viewer={isFullWindow}
 				>
-					{#key useExperimentalLayout}
-						{#if !useExperimentalLayout}
+					{#key `${edition.id}:${selectedViewer}`}
+						{#if useKompakkt}
+							<KompakktViewer {edition} />
+						{:else if !useExperimentalLayout}
 							{#key loadedScene ?? edition.id}
 								{#if needsPreparedScene && useDirectMode && !loadedScene}
 									<div

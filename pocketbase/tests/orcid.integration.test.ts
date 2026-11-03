@@ -87,6 +87,7 @@ beforeAll(async () => {
 	for (const file of [
 		'orcid.pb.js',
 		'orcid-service.cjs',
+		'sandbox-service.cjs',
 		'admin-workflow-service.cjs',
 		'orcid-validation.cjs',
 		'proposal-service.cjs',
@@ -1860,6 +1861,109 @@ integration(
 		}
 	}
 );
+
+integration('admin unpublishing restores private editing with an audit trail', async () => {
+	const visitor = new PocketBase(origin);
+	const scene = JSON.stringify({
+		asset: { type: 'application/si-dpo-3d.document+json', version: '1.0' },
+		scene: 0,
+		scenes: [{ nodes: [] }]
+	});
+	const edition = await root.collection('editions').create({
+		title: 'Published edition for revisions',
+		status: 'published',
+		isPublished: true,
+		credits: [credit],
+		sceneDocument: new File([scene], 'scene.svx.json')
+	});
+	await root.collection('editionUsers').create({
+		editionId: edition.id,
+		userId: author.authStore.record!.id,
+		role: 'author'
+	});
+	const endpoint = `/api/pure3d/editions/${edition.id}/unpublish`;
+	const reason = 'Correct the metadata and Voyager narrative.';
+	const body = { expectedStatus: 'published', reason };
+	expect((await visitor.collection('editions').getOne(edition.id)).isPublished).toBe(true);
+	for (const client of [visitor, author, other]) {
+		await expect(client.send(endpoint, { method: 'POST', body })).rejects.toMatchObject({
+			status: client === visitor ? 401 : 403
+		});
+	}
+	for (const invalid of [
+		{ ...body, reason: '' },
+		{ ...body, expectedStatus: 'final_revisions' }
+	]) {
+		await expect(admin.send(endpoint, { method: 'POST', body: invalid })).rejects.toMatchObject({
+			status: 400
+		});
+	}
+	await expect(
+		admin.collection('editions').update(edition.id, { title: 'Still locked' })
+	).rejects.toBeDefined();
+	expect((await visitor.collection('editions').getOne(edition.id)).title).toBe(edition.title);
+	expect(
+		await root.collection('auditLog').getFullList({
+			filter: `targetId = '${edition.id}' && action = 'edition_unpublished'`
+		})
+	).toHaveLength(0);
+	await expect(admin.send(endpoint, { method: 'POST', body })).resolves.toMatchObject({
+		status: 'final_revisions'
+	});
+	const revisions = await admin.collection('editions').getOne(edition.id);
+	expect(revisions).toMatchObject({
+		status: 'final_revisions',
+		isPublished: false,
+		reviewStage: 3,
+		publishedAt: '',
+		publishedBy: '',
+		peerReviewStamp: false,
+		credits: edition.credits,
+		sceneDocument: edition.sceneDocument
+	});
+	expect(revisions.dcDateUnPublished).toBeTruthy();
+	await expect(visitor.collection('editions').getOne(edition.id)).rejects.toMatchObject({
+		status: 404
+	});
+	expect(
+		await visitor.collection('editions').getFullList({ filter: `id = '${edition.id}'` })
+	).toHaveLength(0);
+	await expect(
+		other.collection('editions').update(edition.id, { title: 'Unauthorised edit' })
+	).rejects.toBeDefined();
+	await expect(admin.send(endpoint, { method: 'POST', body })).rejects.toMatchObject({
+		status: 400
+	});
+	const revisedScene = scene.replace('"nodes":[]', '"nodes":[],"name":"Revised narrative"');
+	await admin.collection('editions').update(edition.id, {
+		title: 'Corrected edition title',
+		dcDescription: '<p>Corrected edition description.</p>',
+		sceneDocument: new File([revisedScene], 'revised.svx.json')
+	});
+	const reopened = await author.collection('editions').getOne(edition.id);
+	expect(reopened).toMatchObject({
+		title: 'Corrected edition title',
+		dcDescription: '<p>Corrected edition description.</p>',
+		status: 'final_revisions',
+		isPublished: false,
+		credits: edition.credits
+	});
+	const token = await author.files.getToken();
+	const savedScene = await fetch(author.files.getURL(reopened, reopened.sceneDocument, { token }));
+	expect(savedScene.status).toBe(200);
+	expect(await savedScene.text()).toBe(revisedScene);
+	await expect(
+		admin.collection('editions').update(edition.id, { status: 'published', isPublished: true })
+	).rejects.toBeDefined();
+	const audit = await root.collection('auditLog').getFullList({
+		filter: `targetId = '${edition.id}' && action = 'edition_unpublished'`
+	});
+	expect(audit).toHaveLength(1);
+	expect(audit[0]).toMatchObject({
+		performedBy: 'users/' + admin.authStore.record!.id,
+		details: { from: 'published', to: 'final_revisions', reason }
+	});
+});
 
 integration(
 	'legacy publication can be preserved but missing creator IDs block new submission/publication',
