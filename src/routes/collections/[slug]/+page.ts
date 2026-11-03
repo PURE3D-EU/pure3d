@@ -36,7 +36,7 @@ export const load: PageLoad = async ({ params }) => {
 		};
 
 		// Get editions for this collection
-		const editionsResult = await pb.collection('editions').getList(1, 500, {
+		const editionsResult = await pb.collection('editions').getFullList({
 			sort: 'pubNum',
 			filter: canRequestHidden
 				? `collection = "${params.slug}"`
@@ -44,7 +44,7 @@ export const load: PageLoad = async ({ params }) => {
 			expand: 'collection'
 		});
 
-		const editions = editionsResult.items.map((record) => {
+		const editions = editionsResult.map((record) => {
 			const col = record.expand?.collection;
 			const collectionPubNum = col?.pubNum || 0;
 			const editionPubNum = record.pubNum || 1;

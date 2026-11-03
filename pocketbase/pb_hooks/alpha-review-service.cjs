@@ -110,13 +110,39 @@ function isEditor(e) {
 }
 
 function protectQuery(e) {
-	if (!isEditor(e)) {
+	if (!e.auth?.isSuperuser()) {
 		const query = e.requestInfo().query;
-		const expression = String(query.filter || '') + ' ' + String(query.sort || '');
-		for (const name of ['editionReviews', 'reviewAssignments']) {
-			const id = e.app.findCollectionByNameOrId(name).id;
-			if (expression.toLowerCase().includes(name.toLowerCase()) || expression.includes(id))
-				throw new ForbiddenError('Private review relationships cannot be queried indirectly.');
+		const privateFields = require('./proposal-service.cjs').proposalFields.concat(
+			editionFields,
+			require('./publication-service.cjs').fields
+		);
+		// Fail closed to schema-local fields and JSON paths. Bare relation IDs remain usable;
+		// traversals, reverse relations and @collection/@request lookups are not API search fields.
+		// This is a lexical allowlist, NOT a filter parser: PocketBase still validates the grammar.
+		// Quoted text uses fexpr's scanText rules (single/double quotes; backslash escapes one rune).
+		// See github.com/ganigeorgiev/fexpr v0.6.0/scanner.go. Comments/unknown tokens are rejected.
+		for (const expression of [String(query.filter || ''), String(query.sort || '')]) {
+			if (expression.includes(String.fromCharCode(0))) throw new ForbiddenError('Invalid query.');
+			const tokens =
+				/"(?:[^"\\]|\\[\s\S])*"|'(?:[^'\\]|\\[\s\S])*'|[A-Za-z_@#][A-Za-z0-9_.:]*|-?\d+(?:\.\d+)?|[ \t\n]+|[(),=?!<>~&|+-]/gy;
+			let offset = 0;
+			while (offset < expression.length) {
+				tokens.lastIndex = offset;
+				const match = tokens.exec(expression);
+				if (!match) throw new ForbiddenError('Unsupported query syntax.');
+				const token = match[0];
+				offset = tokens.lastIndex;
+				if (!/^[A-Za-z_@#]/.test(token) || /^(true|false|null)$/i.test(token)) continue;
+				const root = token.split(/[.:]/)[0];
+				const field = e.collection.fields.getByName(root);
+				if (
+					!field ||
+					field.getHidden() ||
+					privateFields.some((name) => name.toLowerCase() === root.toLowerCase()) ||
+					(token.includes('.') && !['json', 'geoPoint'].includes(field.type()))
+				)
+					throw new ForbiddenError('Only public, local fields can be filtered or sorted.');
+			}
 		}
 	}
 	return e.next();

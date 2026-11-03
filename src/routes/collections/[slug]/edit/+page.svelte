@@ -129,31 +129,31 @@
 	}
 
 	async function removeCollectionMemberships() {
-		const memberships = await pb.collection('collectionUsers').getList(1, 500, {
+		const memberships = await pb.collection('collectionUsers').getFullList({
 			filter: `collection = "${record.id}"`,
 			$autoCancel: false
 		});
 
 		await Promise.all(
-			memberships.items.map((membership) =>
+			memberships.map((membership) =>
 				pb.collection('collectionUsers').delete(membership.id, { $autoCancel: false })
 			)
 		);
 	}
 
 	async function unlinkCollectionEditions() {
-		const collectionEditions = await pb.collection('editions').getList(1, 500, {
+		const collectionEditions = await pb.collection('editions').getFullList({
 			filter: `collection = "${record.id}"`,
 			$autoCancel: false
 		});
 
 		await Promise.all(
-			collectionEditions.items.map((edition) =>
+			collectionEditions.map((edition) =>
 				pb.collection('editions').update(edition.id, { collection: null }, { $autoCancel: false })
 			)
 		);
 
-		return collectionEditions.totalItems;
+		return collectionEditions.length;
 	}
 
 	async function deleteCollection() {

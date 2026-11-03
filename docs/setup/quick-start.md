@@ -1,14 +1,16 @@
 # Quick Start
 
-This project is intended to start from a fresh clone with a single command:
+Copy `.env.example` to private `.env` and set unique `POCKETBASE_ADMIN_PASSWORD` and
+`MINIO_ROOT_PASSWORD` values before starting local services:
 
 ```bash
-docker compose up -d
+make install
+make dev
 ```
 
 ## What happens automatically
 
-On a new machine, `docker compose up -d` will:
+On a new machine, the local Make targets will:
 
 1. Start PocketBase
 2. Create or upgrade the PocketBase schema
@@ -31,11 +33,11 @@ These are created automatically for local development:
 
 If no content data is available yet, the application still starts correctly. You will get an empty database plus working login, demo users, and role-based access.
 
-## Optional local `.env`
+## Private local `.env`
 
-You can run without creating `.env`.
-
-If you want to change ports or admin credentials:
+Local service passwords must be supplied explicitly; there are no Compose password fallbacks.
+Never reuse production credentials. All published service ports bind only to localhost.
+To create your private configuration:
 
 ```bash
 cp .env.example .env
@@ -47,6 +49,7 @@ Then edit:
 - `FRONTEND_PORT`
 - `POCKETBASE_ADMIN_EMAIL`
 - `POCKETBASE_ADMIN_PASSWORD`
+- `MINIO_ROOT_PASSWORD`
 - `PUBLIC_ASSET_BASE_URL`
 
 ## Data locations

@@ -13,8 +13,8 @@ import {
 import schema from '../pocketbase/pb_schema/collections.json';
 
 const POCKETBASE_URL = process.env.POCKETBASE_URL || 'http://localhost:60021';
-const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || 'admin@admin.local';
-const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD || '1234567890';
+const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || '';
+const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD || '';
 
 const pb = new PocketBase(POCKETBASE_URL);
 
@@ -196,6 +196,20 @@ async function dropLegacyUserProfiles() {
 }
 
 async function main() {
+	const target = new URL(POCKETBASE_URL);
+	if (
+		!['http:', 'https:'].includes(target.protocol) ||
+		(!['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname) &&
+			target.origin !== 'http://pocketbase:8090') ||
+		target.username ||
+		target.password ||
+		target.search ||
+		target.hash ||
+		target.pathname !== '/'
+	)
+		throw new Error('Schema bootstrap is restricted to a local PocketBase origin.');
+	if (!ADMIN_EMAIL?.trim() || !ADMIN_PASSWORD?.trim())
+		throw new Error('Set POCKETBASE_ADMIN_EMAIL and POCKETBASE_ADMIN_PASSWORD explicitly.');
 	console.log('Creating PocketBase schema');
 	console.log(`   URL: ${POCKETBASE_URL}`);
 	console.log(`   Admin: ${ADMIN_EMAIL}\n`);
@@ -636,8 +650,8 @@ async function main() {
 		keywords: '',
 		collections: 'isVisible = true || @request.auth.role = "admin"',
 		editions: 'isPublished = true || @request.auth.role = "admin"',
-		collectionUsers: '',
-		editionUsers: '',
+		collectionUsers: schema.find((item) => item.name === 'collectionUsers')!.listRule,
+		editionUsers: schema.find((item) => item.name === 'editionUsers')!.listRule,
 		auditLog: adminRule,
 		editionReviews: adminRule,
 		reviewAssignments: adminRule,

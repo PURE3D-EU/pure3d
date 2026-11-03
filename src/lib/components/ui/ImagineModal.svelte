@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { onMount, untrack } from 'svelte';
+	import { pb, cachePrefix } from '$lib/database/client';
 	import { readCredits } from '$lib/utils/credits';
+	import { safeContentImageUrl } from '$lib/utils/content-components';
 	import toast from 'svelte-french-toast';
 	import FloatingSelect from '$lib/components/ui/FloatingSelect.svelte';
 	import type { Edition } from '$lib/types/collection';
@@ -33,6 +36,7 @@
 	interface GalleryImage {
 		id: string;
 		editionKey: string;
+		ownerKey?: string;
 		url: string;
 		referenceUrl?: string | null;
 		createdAt: number;
@@ -53,87 +57,155 @@
 	let isGenerating = $state(false);
 	let showSettings = $state(false);
 	let apiKey = $state('');
-	let selectedModel = $state(localStorage.getItem('gemini-model') || MODELS[0].id);
+	let selectedModel = $state<string>(MODELS[0].id);
 	let capturedImageDataUrl = $state<string | null>(null);
 	let selectedReferenceImageUrl = $state<string | null>(null);
-	let selectedGalleryImage = $state<GalleryImage | null>(null);
 	let errorMessage = $state<string | null>(null);
 	let sliderPosition = $state(50);
 	let comparisonContainer: HTMLDivElement | undefined = $state();
 	let galleryImages = $state<GalleryImage[]>([]);
 	const comparisonReferenceImageUrl = $derived(selectedReferenceImageUrl || capturedImageDataUrl);
 
-	// Load API key from localStorage on init
+	let generationRevision = 0;
+	let generationController: AbortController | undefined;
+
+	function clearPrivateState() {
+		generationRevision += 1;
+		generationController?.abort();
+		apiKey = '';
+		additionalPrompt = '';
+		galleryImages = [];
+		generatedImageUrl = null;
+		capturedImageDataUrl = null;
+		selectedReferenceImageUrl = null;
+		errorMessage = null;
+		isGenerating = false;
+	}
+
+	onMount(() =>
+		pb.authStore.onChange(() => {
+			// Do not recapture an edition loaded with the previous account's permissions.
+			handleClose();
+		})
+	);
+
 	$effect(() => {
-		if (open) {
-			apiKey = localStorage.getItem('gemini-api-key') || '';
-			selectedModel = localStorage.getItem('gemini-model') || MODELS[0].id;
-			generatedImageUrl = null;
-			selectedReferenceImageUrl = null;
-			selectedGalleryImage = null;
-			errorMessage = null;
-			loadGalleryImages();
-			captureViewerScreenshot();
-		}
+		const isOpen = open;
+		void edition.id;
+		untrack(() => {
+			clearPrivateState();
+			if (isOpen) {
+				void loadGalleryImages();
+				captureViewerScreenshot();
+			}
+		});
+		return () => {
+			generationRevision += 1;
+			generationController?.abort();
+		};
 	});
 
 	function getEditionGalleryKey() {
 		return edition.slug || edition.id || edition.title || 'imagine';
 	}
 
+	function getGalleryOwnerKey() {
+		const owner = pb.authStore.isValid ? pb.authStore.record : null;
+		return owner?.id
+			? `${cachePrefix}:${pb.baseURL}:${owner.collectionName || 'users'}:${owner.id}`
+			: null;
+	}
+
+	function isGeneratedImageUrl(value: unknown): value is string {
+		return (
+			typeof value === 'string' &&
+			/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/\s]+={0,2}$/.test(value)
+		);
+	}
+
 	function openGalleryDb(): Promise<IDBDatabase> {
 		return new Promise((resolve, reject) => {
 			const request = indexedDB.open('pure3d-imagine-gallery', 1);
-
 			request.onupgradeneeded = () => {
-				const db = request.result;
-				if (!db.objectStoreNames.contains('images')) {
-					const store = db.createObjectStore('images', { keyPath: 'id' });
-					store.createIndex('editionKey', 'editionKey');
-				}
+				const store = request.result.createObjectStore('images', { keyPath: 'id' });
+				store.createIndex('editionKey', 'editionKey');
 			};
-
-			request.onsuccess = () => resolve(request.result);
+			request.onsuccess = () => {
+				request.result.onversionchange = () => request.result.close();
+				resolve(request.result);
+			};
 			request.onerror = () => reject(request.error);
 		});
 	}
 
 	async function loadGalleryImages() {
+		const ownerKey = getGalleryOwnerKey();
+		if (!ownerKey) return;
+		const revision = generationRevision;
+		const editionKey = getEditionGalleryKey();
 		try {
 			const db = await openGalleryDb();
+			if (revision !== generationRevision) {
+				db.close();
+				return;
+			}
 			const transaction = db.transaction('images', 'readonly');
-			const index = transaction.objectStore('images').index('editionKey');
-			const request = index.getAll(getEditionGalleryKey());
-
+			const request = transaction.objectStore('images').index('editionKey').getAll(editionKey);
 			request.onsuccess = () => {
-				galleryImages = request.result.sort((a, b) => b.createdAt - a.createdAt);
+				if (revision !== generationRevision || ownerKey !== getGalleryOwnerKey()) return;
+				// Unowned legacy entries remain quarantined in the database, never attributed to a user.
+				galleryImages = (request.result as GalleryImage[])
+					.filter((image) => image.ownerKey === ownerKey && isGeneratedImageUrl(image.url))
+					.map((image) => ({
+						...image,
+						referenceUrl: isGeneratedImageUrl(image.referenceUrl)
+							? image.referenceUrl
+							: safeContentImageUrl(image.referenceUrl)
+					}))
+					.sort((a, b) => b.createdAt - a.createdAt)
+					.slice(0, 24);
 			};
+			transaction.oncomplete = transaction.onerror = transaction.onabort = () => db.close();
 		} catch {
-			galleryImages = [];
+			// Local storage is optional; new images remain available in memory.
 		}
 	}
 
 	async function saveGalleryImage(url: string) {
-		try {
-			const idSuffix =
-				crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-			const image: GalleryImage = {
-				id: `${getEditionGalleryKey()}-${idSuffix}`,
-				editionKey: getEditionGalleryKey(),
-				url,
-				referenceUrl: capturedImageDataUrl,
-				createdAt: Date.now()
-			};
+		const ownerKey = getGalleryOwnerKey();
+		const revision = generationRevision;
+		const idSuffix =
+			crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+		const image: GalleryImage = {
+			id: `${getEditionGalleryKey()}-${idSuffix}`,
+			editionKey: getEditionGalleryKey(),
+			ownerKey: ownerKey || undefined,
+			url,
+			referenceUrl: capturedImageDataUrl,
+			createdAt: Date.now()
+		};
 
+		galleryImages = [image, ...galleryImages].slice(0, 24);
+		selectedReferenceImageUrl = image.referenceUrl || null;
+		// Anonymous sessions have no stable owner and must not persist private references.
+		if (!ownerKey) return;
+		try {
 			const db = await openGalleryDb();
+			if (revision !== generationRevision || ownerKey !== getGalleryOwnerKey()) {
+				db.close();
+				return;
+			}
 			const transaction = db.transaction('images', 'readwrite');
 			transaction.objectStore('images').put(image);
-
-			galleryImages = [image, ...galleryImages].slice(0, 24);
-			selectedGalleryImage = image;
-			selectedReferenceImageUrl = image.referenceUrl || null;
+			transaction.oncomplete = () => db.close();
+			transaction.onerror = transaction.onabort = () => {
+				db.close();
+				if (revision === generationRevision)
+					toast.error('Generated image could not be saved locally');
+			};
 		} catch {
-			toast.error('Generated image could not be saved locally');
+			if (revision === generationRevision)
+				toast.error('Generated image could not be saved locally');
 		}
 	}
 
@@ -161,13 +233,12 @@
 	}
 
 	function saveApiKey() {
-		localStorage.setItem('gemini-api-key', apiKey.trim());
-		toast.success('Gemini API key saved');
+		apiKey = apiKey.trim();
+		toast.success('Gemini API key ready for this session');
 		showSettings = false;
 	}
 
 	function clearApiKey() {
-		localStorage.removeItem('gemini-api-key');
 		apiKey = '';
 		toast.success('API key cleared');
 	}
@@ -228,22 +299,28 @@
 		dataUrl: string,
 		maxDim = 1024
 	): Promise<{ data: string; mimeType: string }> {
-		return new Promise((resolve) => {
+		return new Promise((resolve, reject) => {
 			const img = new Image();
+			img.crossOrigin = 'anonymous';
+			img.onerror = () => reject(new Error('The reference image could not load.'));
 			img.onload = () => {
-				let { width, height } = img;
-				if (width > maxDim || height > maxDim) {
-					const scale = maxDim / Math.max(width, height);
-					width = Math.round(width * scale);
-					height = Math.round(height * scale);
+				try {
+					let { width, height } = img;
+					if (width > maxDim || height > maxDim) {
+						const scale = maxDim / Math.max(width, height);
+						width = Math.round(width * scale);
+						height = Math.round(height * scale);
+					}
+					const c = document.createElement('canvas');
+					c.width = width;
+					c.height = height;
+					const ctx = c.getContext('2d')!;
+					ctx.drawImage(img, 0, 0, width, height);
+					const jpeg = c.toDataURL('image/jpeg', 0.85);
+					resolve({ data: jpeg.split(',')[1], mimeType: 'image/jpeg' });
+				} catch {
+					reject(new Error('The reference image could not be read.'));
 				}
-				const c = document.createElement('canvas');
-				c.width = width;
-				c.height = height;
-				const ctx = c.getContext('2d')!;
-				ctx.drawImage(img, 0, 0, width, height);
-				const jpeg = c.toDataURL('image/jpeg', 0.85);
-				resolve({ data: jpeg.split(',')[1], mimeType: 'image/jpeg' });
 			};
 			img.src = dataUrl;
 		});
@@ -322,17 +399,25 @@
 	 * Generate image using Google Gemini API (Imagen)
 	 */
 	async function generateImage() {
-		const key = apiKey.trim() || localStorage.getItem('gemini-api-key')?.trim();
+		if (!open || isGenerating) return;
+		const key = apiKey.trim();
 		if (!key) {
 			showSettings = true;
 			toast.error('Please set your Gemini API key first');
 			return;
 		}
+		const model = MODELS.find((option) => option.id === selectedModel);
+		if (!model) {
+			errorMessage = 'Choose a supported model.';
+			return;
+		}
+		const revision = ++generationRevision;
+		const controller = new AbortController();
+		generationController = controller;
 
 		isGenerating = true;
 		errorMessage = null;
 		generatedImageUrl = null;
-		selectedGalleryImage = null;
 		selectedReferenceImageUrl = null;
 		sliderPosition = 50;
 
@@ -345,13 +430,15 @@
 				const resized = await resizeImage(capturedImageDataUrl);
 				imagePart = { inlineData: resized };
 			}
+			if (revision !== generationRevision) return;
 
 			// Use selected Gemini image generation model
 			const response = await fetch(
-				`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`,
+				`https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent`,
 				{
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
+					headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+					signal: controller.signal,
 					body: JSON.stringify({
 						contents: [
 							{
@@ -373,13 +460,18 @@
 			}
 
 			const data = await response.json();
+			if (revision !== generationRevision) return;
 
 			// Extract generated image from response
 			const candidates = data.candidates || [];
 			for (const candidate of candidates) {
 				const parts = candidate.content?.parts || [];
 				for (const part of parts) {
-					if (part.inlineData?.mimeType?.startsWith('image/')) {
+					if (
+						['image/png', 'image/jpeg', 'image/webp'].includes(part.inlineData?.mimeType) &&
+						typeof part.inlineData.data === 'string' &&
+						/^[A-Za-z0-9+/\s]*={0,2}$/.test(part.inlineData.data)
+					) {
 						generatedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
 						break;
 					}
@@ -395,15 +487,16 @@
 
 			await saveGalleryImage(generatedImageUrl);
 		} catch (err: unknown) {
+			if (revision !== generationRevision) return;
 			errorMessage = err instanceof Error ? err.message : 'Failed to generate image';
 			toast.error('Image generation failed');
 		} finally {
-			isGenerating = false;
+			if (revision === generationRevision) isGenerating = false;
 		}
 	}
 
 	function downloadImage(url = generatedImageUrl) {
-		if (!url) return;
+		if (!isGeneratedImageUrl(url)) return;
 		const slug = edition.slug || 'imagine';
 		const ext = url.startsWith('data:image/jpeg') ? 'jpg' : 'png';
 		const a = document.createElement('a');
@@ -413,7 +506,6 @@
 	}
 
 	function selectGalleryImage(image: GalleryImage) {
-		selectedGalleryImage = image;
 		generatedImageUrl = image.url;
 		selectedReferenceImageUrl = image.referenceUrl || null;
 		errorMessage = null;
@@ -421,12 +513,13 @@
 	}
 
 	function handleClose() {
+		clearPrivateState();
 		open = false;
 		onclose();
 	}
 </script>
 
-<dialog class="modal" class:modal-open={open}>
+<dialog id="imagine-modal" class="modal" class:modal-open={open}>
 	<div class="modal-box max-w-3xl">
 		<!-- Header -->
 		<div class="mb-4 flex items-center justify-between">
@@ -515,7 +608,8 @@
 						target="_blank"
 						rel="noopener noreferrer"
 						class="link link-primary">Google AI Studio</a
-					>. The key is stored locally in your browser.
+					>. The key stays in memory only and is cleared when you close this window or change
+					account.
 				</p>
 				<div class="flex gap-2">
 					<input
@@ -523,9 +617,10 @@
 						class="input-bordered input input-sm flex-1"
 						placeholder="Enter your Gemini API key..."
 						bind:value={apiKey}
+						autocomplete="off"
 						onkeydown={(e) => e.key === 'Enter' && saveApiKey()}
 					/>
-					<button type="button" class="btn btn-sm btn-primary" onclick={saveApiKey}>Save</button>
+					<button type="button" class="btn btn-sm btn-primary" onclick={saveApiKey}>Use key</button>
 					{#if apiKey}
 						<button type="button" class="btn btn-ghost btn-sm" onclick={clearApiKey}>Clear</button>
 					{/if}
@@ -539,8 +634,7 @@
 						options={MODEL_OPTIONS}
 						class="w-full"
 						onchange={(model) => {
-							selectedModel = model;
-							localStorage.setItem('gemini-model', selectedModel);
+							if (MODELS.some((option) => option.id === model)) selectedModel = model;
 						}}
 					/>
 				</div>
@@ -640,20 +734,15 @@
 			</div>
 		{/if}
 
-		{#if generatedImageUrl && selectedGalleryImage && !selectedGalleryImage.referenceUrl}
-			<div class="mb-4 alert py-2 text-xs alert-info">
-				<span>
-					This older gallery image was saved before reference pairing was available, so it uses the
-					current 3D reference. Newly generated images will switch both sides together.
-				</span>
-			</div>
-		{/if}
-
 		{#if galleryImages.length}
 			<div class="mb-4 rounded-lg bg-base-200 p-2.5">
 				<div class="mb-1.5 flex items-center justify-between gap-3">
 					<p class="text-xs font-semibold text-base-content/60">Generated gallery</p>
-					<p class="text-xs text-base-content/40">Stored locally in this browser</p>
+					<p class="text-xs text-base-content/40">
+						{getGalleryOwnerKey()
+							? 'Saved locally for this account'
+							: 'Cleared when this window closes'}
+					</p>
 				</div>
 				<div class="flex gap-1.5 overflow-x-auto pb-1">
 					{#each galleryImages as image, index (`${image.id}-${image.createdAt}-${index}`)}
@@ -779,6 +868,10 @@
 		{/if}
 
 		<!-- Actions -->
+		<p class="text-xs text-base-content/60">
+			Generating sends the reference image, edition metadata and your instructions to Google using
+			your API key. Google API charges may apply. Only send content you are authorised to share.
+		</p>
 		<div class="modal-action">
 			{#if generatedImageUrl}
 				<button type="button" class="btn btn-outline btn-sm" onclick={() => downloadImage()}>

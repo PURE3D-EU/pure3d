@@ -1,12 +1,27 @@
 #!/usr/bin/env bun
 /**
- * Fix access rules for existing PocketBase collections
+ * Restore the checked-in read rules, never blanket public access.
  */
-const PB_URL = 'http://127.0.0.1:60021';
-const ADMIN_EMAIL = 'admin@admin.local';
-const ADMIN_PASSWORD = '1234567890';
+import schema from '../pocketbase/pb_schema/collections.json';
+const PB_URL = process.env.POCKETBASE_URL || 'http://127.0.0.1:60021';
+const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD;
 
 async function main() {
+	const target = new URL(PB_URL);
+	if (
+		!['http:', 'https:'].includes(target.protocol) ||
+		(!['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname) &&
+			target.origin !== 'http://pocketbase:8090') ||
+		target.username ||
+		target.password ||
+		target.search ||
+		target.hash ||
+		target.pathname !== '/'
+	)
+		throw new Error('Access-rule repair is restricted to a local PocketBase origin.');
+	if (!ADMIN_EMAIL?.trim() || !ADMIN_PASSWORD?.trim())
+		throw new Error('Set POCKETBASE_ADMIN_EMAIL and POCKETBASE_ADMIN_PASSWORD explicitly.');
 	// Authenticate
 	const authResponse = await fetch(`${PB_URL}/api/collections/_superusers/auth-with-password`, {
 		method: 'POST',
@@ -21,8 +36,7 @@ async function main() {
 	const { token } = await authResponse.json();
 	console.log('✅ Authenticated\n');
 
-	// Update each collection to allow public read access
-	const collections = ['site', 'collections', 'editions'];
+	const collections = ['site', 'collections', 'editions', 'collectionUsers', 'editionUsers'];
 
 	for (const collectionName of collections) {
 		console.log(`📝 Updating ${collectionName} access rules...`);
@@ -39,7 +53,7 @@ async function main() {
 
 		const collection = await getResponse.json();
 
-		// Update with public access rules
+		const desired = schema.find((item) => item.name === collectionName)!;
 		const updateResponse = await fetch(`${PB_URL}/api/collections/${collection.id}`, {
 			method: 'PATCH',
 			headers: {
@@ -47,8 +61,8 @@ async function main() {
 				Authorization: token
 			},
 			body: JSON.stringify({
-				listRule: '', // Empty string = allow public list access
-				viewRule: '' // Empty string = allow public view access
+				listRule: desired.listRule,
+				viewRule: desired.viewRule
 			})
 		});
 
@@ -62,4 +76,7 @@ async function main() {
 	console.log('\n✅ All access rules updated!');
 }
 
-main().catch(console.error);
+main().catch((error) => {
+	console.error('Access-rule repair failed:', error.message);
+	process.exitCode = 1;
+});

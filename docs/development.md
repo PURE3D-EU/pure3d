@@ -48,7 +48,10 @@ Local commands select `docker-compose.yml` plus `docker-compose.local.yml`:
 
 Existing `FRONTEND_PORT` (60020), `POCKETBASE_PORT` (60021), `MINIO_API_PORT`
 (60023), and `MINIO_CONSOLE_PORT` (60024) remain configurable. Container ports
-remain 14273, 8090, 9000, and 9001. Existing credential defaults are unchanged.
+remain 14273, 8090, 9000, and 9001. Host service ports bind only to `127.0.0.1`.
+Set unique local `POCKETBASE_ADMIN_PASSWORD` and `MINIO_ROOT_PASSWORD` values in private `.env`;
+Compose refuses missing or empty passwords. Do not reuse production credentials. The backend and
+MinIO server images are pinned; applying an image update requires a deliberate local restart.
 
 Use the Make targets, not bare `docker compose up` or `bun run dev`, for this
 isolation contract. The base Compose file alone still accepts environment settings.

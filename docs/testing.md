@@ -26,6 +26,11 @@ These tests do not publish releases, migrate production data, or use application
 They do not need Docker Compose. The native backend tests below are discovered but skipped
 unless an explicit binary is supplied.
 
+CI supplies the official PocketBase 0.40.3 Linux binary through
+`.github/actions/setup-pocketbase`, verifies its pinned SHA-256 checksum and exports
+`PB_TEST_BINARY` before both pull-request checks and automatic release checks. Those jobs must
+execute the real backend journeys, not rely on the default suite's native-test skips.
+
 ## Real backend journeys
 
 ```sh

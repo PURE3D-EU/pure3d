@@ -70,30 +70,9 @@ routerAdd(
 		if (!key || key.startsWith('/') || key.split('/').includes('..')) {
 			throw new BadRequestError('Invalid object key.');
 		}
-		const expectedSizeValue = event.request.url.query().get('size');
-		const expectedModified = event.request.url.query().get('modified');
-		if (expectedSizeValue === null || expectedSizeValue.trim() === '' || !expectedModified) {
-			throw new BadRequestError('Object version is required.');
-		}
-		const expectedSize = Number(expectedSizeValue);
-		if (!Number.isFinite(expectedSize)) throw new BadRequestError('Invalid object size.');
-		let filesystem;
-		try {
-			filesystem = event.app.newFilesystem();
-			if (!filesystem.exists(key)) throw new NotFoundError('Object not found.');
-			const attributes = filesystem.attributes(key);
-			const modified = attributes.modTime.format('2006-01-02T15:04:05.000Z07:00');
-			if (attributes.size !== expectedSize || modified !== expectedModified) {
-				throw new ApiError(
-					409,
-					'Object changed since the inventory was loaded. Refresh and retry.'
-				);
-			}
-			filesystem.delete(key);
-			return event.noContent(204);
-		} finally {
-			filesystem?.close();
-		}
+		// PocketBase's filesystem abstraction exposes only unconditional key deletion.
+		// Checking attributes first cannot prevent deletion of a concurrent replacement.
+		throw new ApiError(501, 'Safe conditional deletion is unavailable. No object was deleted.');
 	},
 	$apis.requireAuth('users')
 );

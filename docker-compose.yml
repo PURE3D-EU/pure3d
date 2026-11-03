@@ -1,14 +1,14 @@
 services:
   minio:
-    image: minio/minio:latest
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     ports:
-      - '${MINIO_API_PORT:-60023}:9000'
-      - '${MINIO_CONSOLE_PORT:-60024}:9001'
+      - '127.0.0.1:${MINIO_API_PORT:-60023}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-60024}:9001'
     volumes:
       - ./minio/data:/data
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-pure3d}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-pure3d-local-secret}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?Set a private local MinIO password in .env}
     command: server /data --console-address ':9001'
     restart: unless-stopped
 
@@ -20,22 +20,22 @@ services:
       - ./:/app:ro
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-pure3d}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-pure3d-local-secret}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?Set a private local MinIO password in .env}
       - R2_BUCKET=${R2_BUCKET:-pure3d-assets}
     entrypoint: ['/bin/sh', '/app/scripts/setup-minio.sh']
     restart: 'no'
 
   pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
+    image: ghcr.io/muchobien/pocketbase:0.40.3@sha256:ab3f2357cce759aa8ccd4863ac49f07060ce4a12097d3cac52ac519d6ca68ecc
     ports:
-      - '${POCKETBASE_PORT:-60021}:8090'
+      - '127.0.0.1:${POCKETBASE_PORT:-60021}:8090'
     volumes:
       - ./pocketbase/pb_data:/pb/pb_data
       - ./pocketbase/pb_hooks:/pb/pb_hooks:ro
       - ./pocketbase-entrypoint.sh:/entrypoint.sh:ro
     environment:
       - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL:-admin@admin.local}
-      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD:-1234567890}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD:?Set a private local PocketBase password in .env}
       - PUBLIC_POCKETBASE_URL=${PUBLIC_POCKETBASE_URL:-http://localhost:60021}
       - ORCID_ISSUER=${ORCID_ISSUER:-https://orcid.org}
       - SMTP_ENABLED=${SMTP_ENABLED:-false}
@@ -64,11 +64,11 @@ services:
       - POCKETBASE_URL=http://pocketbase:8090
       - PUBLIC_POCKETBASE_URL=${PUBLIC_POCKETBASE_URL:-http://localhost:60021}
       - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL:-admin@admin.local}
-      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD:-1234567890}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD:?Set a private local PocketBase password in .env}
       - R2_ENDPOINT=${R2_ENDPOINT:-http://minio:9000}
       - R2_BUCKET=${R2_BUCKET:-pure3d-assets}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-pure3d}
-      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-pure3d-local-secret}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:?Set a private local MinIO password in .env}}
     depends_on:
       minio-setup:
         condition: service_completed_successfully
@@ -94,7 +94,7 @@ services:
       - ./:/app
       - /app/node_modules
     ports:
-      - '${FRONTEND_PORT:-60020}:14273'
+      - '127.0.0.1:${FRONTEND_PORT:-60020}:14273'
     environment:
       - PUBLIC_POCKETBASE_URL=${PUBLIC_POCKETBASE_URL:-http://localhost:60021}
       - PUBLIC_ASSET_BASE_URL=${PUBLIC_ASSET_BASE_URL:-http://localhost:60023/pure3d-assets}

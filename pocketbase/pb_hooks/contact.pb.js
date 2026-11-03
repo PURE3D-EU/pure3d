@@ -26,13 +26,28 @@ routerAdd(
 		if (!settings.smtp.enabled) {
 			throw new ApiError(503, 'Contact email is currently unavailable.');
 		}
-		// Bound public email traffic without storing visitors' IPs or message content.
+		// SetFunc holds the store lock for the complete read/modify/write operation.
+		// Check the client first so repeated requests cannot consume the global allowance.
 		const store = event.app.store();
 		const now = Date.now();
-		if (Number(store.get('pure3d.contact.nextSendAt') || 0) > now) {
+		const secret = store.getOrSet('pure3d.contact.secret', () => $security.randomString(64));
+		const client = $security.hs256(event.realIP(), String(secret));
+		let admitted = false;
+		store.setFunc('pure3d.contact.limits', (old) => {
+			const state = old ? JSON.parse(String(old)) : { clients: {}, sends: [] };
+			for (const key of Object.keys(state.clients))
+				if (state.clients[key] <= now) delete state.clients[key];
+			state.sends = state.sends.filter((sent) => sent > now - 60000);
+			if (!state.clients[client] && state.sends.length < 10) {
+				state.clients[client] = now + 60000;
+				state.sends.push(now);
+				admitted = true;
+			}
+			return JSON.stringify(state);
+		});
+		if (!admitted) {
 			throw new TooManyRequestsError('Please wait a moment before sending another message.');
 		}
-		store.set('pure3d.contact.nextSendAt', now + 10000);
 		try {
 			event.app.newMailClient().send(
 				new MailerMessage({

@@ -18,7 +18,7 @@ const getVersion = (): string => {
 
 export default defineConfig(({ command, isPreview }) => ({
 	server: {
-		host: '0.0.0.0',
+		host: '127.0.0.1',
 		port: 60020,
 		allowedHosts: ['m3-max.tail33436f.ts.net'],
 		...(command === 'serve' && !isPreview && process.env.DEV_HTTPS === '1'

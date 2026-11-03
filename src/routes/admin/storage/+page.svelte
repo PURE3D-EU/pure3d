@@ -41,7 +41,6 @@
 	let objects = $state<StorageObject[]>([]);
 	let loading = $state(true);
 	let refreshing = $state(false);
-	let deletingKey = $state('');
 	let downloadingKey = $state('');
 	let errorMessage = $state('');
 	let query = $state('');
@@ -135,29 +134,6 @@
 		}
 	}
 
-	async function deleteObject(object: StorageObject) {
-		if (
-			!confirm(
-				`Permanently delete "${object.key}"? This may be referenced by PocketBase and cannot be undone.`
-			)
-		)
-			return;
-		deletingKey = object.key;
-		try {
-			await pb.send('/api/pure3d/storage', {
-				method: 'DELETE',
-				query: { key: object.key, size: object.size, modified: object.modified }
-			});
-			objects = objects.filter((item) => item.key !== object.key);
-			toast.success('Object deleted');
-		} catch (error) {
-			console.error('Failed to delete object:', error);
-			toast.error('Failed to delete object');
-		} finally {
-			deletingKey = '';
-		}
-	}
-
 	async function applyPrefix() {
 		prefix = prefixDraft.trim();
 		cursorHistory = [];
@@ -203,7 +179,11 @@
 			</p>
 			<h1 class="text-3xl font-bold">Storage Management</h1>
 			<p class="mt-2 max-w-2xl text-base-content/60">
-				Find, inspect, download, and remove files from the connected S3 bucket.
+				Find, inspect and download files from the connected S3 bucket.
+			</p>
+			<p class="mt-2 max-w-2xl text-sm text-base-content/60">
+				Deletion is disabled to prevent removing files that have changed since the inventory was
+				loaded.
 			</p>
 		</div>
 		<button
@@ -347,13 +327,6 @@
 										disabled={downloadingKey === object.key}
 										>{downloadingKey === object.key ? 'Preparing...' : 'Download'}</button
 									>
-									<button
-										type="button"
-										class="btn text-error btn-ghost btn-xs"
-										onclick={() => deleteObject(object)}
-										disabled={Boolean(deletingKey)}
-										>{deletingKey === object.key ? 'Deleting...' : 'Delete'}</button
-									>
 								</div>
 							</td>
 						</tr>
@@ -369,18 +342,12 @@
 					<div class="mt-3 flex justify-between text-xs text-base-content/55">
 						<span>{formatSize(object.size)}</span><span>{formatDate(object.modified)}</span>
 					</div>
-					<div class="mt-4 grid grid-cols-2 gap-2">
+					<div class="mt-4 flex gap-2">
 						<button
 							type="button"
 							class="btn btn-outline btn-sm"
 							onclick={() => downloadObject(object)}
 							disabled={downloadingKey === object.key}>Download</button
-						>
-						<button
-							type="button"
-							class="btn text-error btn-ghost btn-sm"
-							onclick={() => deleteObject(object)}
-							disabled={Boolean(deletingKey)}>Delete</button
 						>
 					</div>
 				</article>

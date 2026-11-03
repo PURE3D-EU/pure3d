@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- This fixture runs inside PocketBase Goja. */
 // Test-only fixture, copied into a disposable --hooksDir. Never deploy this file.
 // Loaded before production hooks. Native token exchange/signature verification has already completed.
+// Replace only the external SMTP boundary for contact feature requests in this disposable fixture.
+onMailerSend((e) => {
+	if (e.message.subject.startsWith('PURE3D contact: ')) return;
+	return e.next();
+});
+
 onRecordAuthWithOAuth2Request((e) => {
 	const config = e.app.store().get('test.native.oauth');
 	if (config && config.tokenURL && e.providerClient.tokenURL() === config.tokenURL) {

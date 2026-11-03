@@ -60,7 +60,7 @@ dev-prod:
 		export PUBLIC_DEMO_LOGIN=0; \
 		export PUBLIC_POCKETBASE_URL="https://api.pure3d.eu"; \
 		export PUBLIC_ASSET_BASE_URL="https://api.pure3d.eu/assets"; \
-		bun install && bun run dev --host 0.0.0.0 --port "$${FRONTEND_PORT:-60020}"
+		bun install && bun run dev --host 127.0.0.1 --port "$${FRONTEND_PORT:-60020}"
 
 dev-web: dev-cert
 	@$(LOCAL_COMPOSE) up -d minio minio-setup pocketbase pocketbase-setup voyager-setup
@@ -71,7 +71,7 @@ dev-web: dev-cert
 		export DEV_ASSET_TARGET="http://127.0.0.1:$${MINIO_API_PORT:-60023}" DEV_ASSET_BUCKET="$${R2_BUCKET:-pure3d-assets}"; \
 		export PUBLIC_DEMO_LOGIN=1; \
 		export ORCID_CLIENT_ID= ORCID_CLIENT_SECRET=; \
-		bun install && bun run dev --host 0.0.0.0 --port "$${FRONTEND_PORT:-60020}"
+		bun install && bun run dev --host 127.0.0.1 --port "$${FRONTEND_PORT:-60020}"
 
 bun-dev: dev-web
 

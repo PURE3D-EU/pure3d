@@ -1,17 +1,8 @@
-/**
- * Persisted data stores for editions and collections.
- *
- * These stores cache data in localStorage, providing instant display on page load
- * while fresh data is fetched in the background. This eliminates loading spinners
- * on repeat visits and creates a smoother browsing experience.
- *
- * Pattern: "stale-while-revalidate"
- * - Show cached data immediately
- * - Fetch fresh data in background
- * - Update store (and cache) when fresh data arrives
- */
+/** Catalogue metadata stays in memory; only the public home cards are persisted. */
 
 import { persisted } from 'svelte-persisted-store';
+import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
 import { creatorNames, readCredits } from '$lib/utils/credits';
 import { pb, cachePrefix } from '$lib/database/client';
 import type { Edition, Collection } from '$lib/types/collection';
@@ -45,23 +36,29 @@ interface CollectionsData {
 	countError?: string | null;
 }
 
-// Persisted stores with localStorage
-export const editionsStore = persisted<EditionsData>(`${cachePrefix}:editions:credits-v1`, {
+export const editionsStore = writable<EditionsData>({
 	items: [],
 	total: 0,
 	lastFetched: null
 });
 
-export const collectionsStore = persisted<CollectionsData>(
-	`${cachePrefix}:collections:credits-v1`,
-	{
-		items: [],
-		total: 0,
-		lastFetched: null,
-		countsLastFetched: null,
-		countError: null
-	}
-);
+export const collectionsStore = writable<CollectionsData>({
+	items: [],
+	total: 0,
+	lastFetched: null,
+	countsLastFetched: null,
+	countError: null
+});
+
+// An auth revision also rejects results from a previous sign-in to the same account.
+let authRevision = 0;
+if (browser) {
+	pb.authStore.onChange(() => {
+		authRevision += 1;
+		editionsStore.set({ items: [], total: 0, lastFetched: null });
+		collectionsStore.set({ items: [], total: 0, lastFetched: null });
+	});
+}
 
 // The home page needs only a handful of cards, not the full catalogue or its metadata.
 export const homeStore = persisted<{
@@ -139,15 +136,17 @@ export async function fetchHomeData() {
  * Returns the mapped editions array.
  */
 export async function fetchEditions(): Promise<Edition[]> {
+	const revision = authRevision;
 	const canRequestHidden = pb.authStore.isValid;
-	const result = await pb.collection('editions').getList(1, 500, {
+	const result = await pb.collection('editions').getFullList({
 		filter: canRequestHidden ? undefined : 'isPublished = true',
 		expand: 'collection',
 		fields: EDITION_CARD_FIELDS,
 		$autoCancel: false // Prevent auto-cancellation when fetching in parallel with other requests
 	});
+	if (revision !== authRevision) return [];
 
-	const mappedEditions = result.items.map((record) => {
+	const mappedEditions = result.map((record) => {
 		const collection = record.expand?.collection;
 		const collectionPubNum = collection?.pubNum || 0;
 		const editionPubNum = record.pubNum || 1;
@@ -223,7 +222,7 @@ export async function fetchEditions(): Promise<Edition[]> {
 
 	editionsStore.set({
 		items: mappedEditions,
-		total: result.totalItems,
+		total: mappedEditions.length,
 		lastFetched: Date.now()
 	});
 
@@ -235,14 +234,16 @@ export async function fetchEditions(): Promise<Edition[]> {
  * Returns the mapped collections array.
  */
 export async function refreshCollectionCounts() {
+	const revision = authRevision;
 	try {
-		const editionsResult = await pb.collection('editions').getList(1, 500, {
+		const editionsResult = await pb.collection('editions').getFullList({
 			filter: 'isPublished = true',
 			fields: 'id,collection',
 			skipTotal: true,
 			$autoCancel: false
 		});
-		const countMap = countEditionsByCollection(editionsResult.items);
+		if (revision !== authRevision) return;
+		const countMap = countEditionsByCollection(editionsResult);
 		collectionsStore.update((current) => ({
 			...current,
 			items: current.items.map((collection) => ({
@@ -253,6 +254,7 @@ export async function refreshCollectionCounts() {
 			countError: null
 		}));
 	} catch (error) {
+		if (revision !== authRevision) return;
 		collectionsStore.update((current) => ({
 			...current,
 			countError: error instanceof Error ? error.message : 'Unable to load edition counts'
@@ -261,13 +263,15 @@ export async function refreshCollectionCounts() {
 }
 
 export async function fetchCollections(): Promise<(Collection & { editionCount?: number })[]> {
+	const revision = authRevision;
 	const canRequestHidden = pb.authStore.isValid;
-	const collectionsResult = await pb.collection('collections').getList(1, 500, {
+	const collectionsResult = await pb.collection('collections').getFullList({
 		sort: 'pubNum',
 		filter: canRequestHidden ? undefined : 'isVisible = true',
 		fields: COLLECTION_CARD_FIELDS,
 		$autoCancel: false
 	});
+	if (revision !== authRevision) return [];
 	let cachedCounts: Record<string, number> = {};
 	let cachedCountsLastFetched: number | null = null;
 	collectionsStore.subscribe((current) => {
@@ -279,7 +283,7 @@ export async function fetchCollections(): Promise<(Collection & { editionCount?:
 		cachedCountsLastFetched = current.countsLastFetched ?? null;
 	})();
 
-	const mappedCollections = collectionsResult.items.map((record) => {
+	const mappedCollections = collectionsResult.map((record) => {
 		// Cover image: uploaded coverImage file → legacy thumbnail URL → asset URL from pubNum
 		const thumbnail = getCollectionCoverUrl(record, record.pubNum) || '';
 
@@ -316,7 +320,7 @@ export async function fetchCollections(): Promise<(Collection & { editionCount?:
 
 	collectionsStore.set({
 		items: mappedCollections,
-		total: collectionsResult.totalItems,
+		total: mappedCollections.length,
 		lastFetched: Date.now(),
 		countsLastFetched: cachedCountsLastFetched,
 		countError: null

@@ -85,7 +85,9 @@ beforeAll(async () => {
 	const hooks = join(directory, 'hooks');
 	await mkdir(hooks);
 	for (const file of [
-		'orcid.pb.js',
+		'contact.pb.js',
+		'storage-dashboard.pb.js',
+		'storage-dashboard-service.cjs',
 		'orcid-service.cjs',
 		'sandbox-service.cjs',
 		'admin-workflow-service.cjs',
@@ -99,9 +101,14 @@ beforeAll(async () => {
 		'orcid-readiness.cjs'
 	])
 		await copyFile(resolve('pocketbase/pb_hooks', file), join(hooks, file));
-	await copyFile(
-		resolve('pocketbase/tests/fixtures/orcid.pb.js'),
-		join(hooks, '00-test-fixture.pb.js')
+	// PocketBase 0.40.3 loads hook files from a Go map; filename order is not guaranteed.
+	// Register the transport fixture before the production guard in ONE file, rather than
+	// intermittently running the guard before the already-verified native OAuth fixture.
+	await writeFile(
+		join(hooks, 'orcid.pb.js'),
+		(await readFile(resolve('pocketbase/tests/fixtures/orcid.pb.js'), 'utf8')) +
+			'\n' +
+			(await readFile(resolve('pocketbase/pb_hooks/orcid.pb.js'), 'utf8'))
 	);
 	await writeFile(
 		join(hooks, 'schema.json'),
@@ -187,6 +194,452 @@ async function oauth(body: Record<string, unknown>, token = '') {
 	});
 	return { status: response.status, body: await response.json() };
 }
+
+async function deleteEditionFixture(id: string) {
+	// Remove stage-one workflow children while their parent still exists. Do not bypass
+	// production relation constraints or model hooks just to tear down a test fixture.
+	for (const name of ['reviewFeedback', 'editionReviews', 'reviewAssignments']) {
+		const filter = root.filter('editionId = {:id}', { id });
+		for (const child of await root.collection(name).getFullList({ filter }))
+			await root.collection(name).delete(child.id);
+		expect(await root.collection(name).getFullList({ filter })).toHaveLength(0);
+	}
+	await root.collection('editions').delete(id);
+	await expect(root.collection('editions').getOne(id)).rejects.toMatchObject({ status: 404 });
+}
+
+integration('public searches cannot probe private parents or siblings through joins', async () => {
+	const visitor = new PocketBase(origin);
+	const parent = await root.collection('collections').create({
+		title: 'Parent query signal',
+		isVisible: true,
+		credits: [credit]
+	});
+	const sibling = await root.collection('editions').create({
+		title: 'Private sibling query signal',
+		collection: parent.id,
+		credits: [credit]
+	});
+	const title = 'A proposalPurpose about collectionUsers and alphaRequest: "3D\'s study"';
+	const published = await root.collection('editions').create({
+		title,
+		collection: parent.id,
+		status: 'published',
+		isPublished: true,
+		credits: [credit]
+	});
+	try {
+		expect((await visitor.collection('collections').getOne(parent.id)).id).toBe(parent.id);
+		await expect(visitor.collection('editions').getOne(sibling.id)).rejects.toMatchObject({
+			status: 404
+		});
+		const probes = [
+			{
+				name: 'users',
+				id: credit.userId,
+				query: {
+					filter: `id = '${credit.userId}' && @collection.editions.title ?= '${sibling.title}'`
+				}
+			},
+			{
+				name: 'editions',
+				id: published.id,
+				query: {
+					filter: `id = '${published.id}' && @collection.${published.collectionId}:private.title ?= '${sibling.title}'`
+				}
+			},
+			{
+				name: 'editions',
+				id: published.id,
+				query: {
+					filter: `id = '${published.id}' && collection.editions_via_collection.title ?= '${sibling.title}'`
+				}
+			},
+			{
+				name: 'editions',
+				id: published.id,
+				query: { filter: `id = '${published.id}' && collection.title = '${parent.title}'` }
+			},
+			{
+				name: 'editions',
+				id: published.id,
+				query: { sort: 'collection.editions_via_collection.title' }
+			}
+		];
+		// Controls establish that the native API accepts the paths and can see the matching data.
+		for (const probe of probes)
+			expect(
+				(await root.collection(probe.name).getFullList(probe.query)).some(
+					(record) => record.id === probe.id
+				)
+			).toBe(true);
+		const statuses = [];
+		for (const probe of probes) {
+			const response = await fetch(
+				origin + '/api/collections/' + probe.name + '/records?' + new URLSearchParams(probe.query)
+			);
+			statuses.push(response.status);
+		}
+		expect(statuses).toEqual(probes.map(() => 403));
+		await root.collection('collections').update(parent.id, { isVisible: false });
+		await expect(visitor.collection('collections').getOne(parent.id)).rejects.toMatchObject({
+			status: 404
+		});
+		await expect(
+			visitor.collection('editions').getFullList({
+				filter: `id = '${published.id}' && collection.title = '${parent.title}'`
+			})
+		).rejects.toMatchObject({ status: 403 });
+		for (const filter of [
+			visitor.filter('title = {:title}', { title }),
+			`title = ${JSON.stringify(title)}`,
+			`isPublished = true && credits ~ '${credit.userId}'`,
+			`isPublished = true && credits.0.userId = '${credit.userId}'`
+		])
+			expect(
+				(await visitor.collection('editions').getFullList({ filter, sort: 'title' })).some(
+					(record) => record.id === published.id
+				)
+			).toBe(true);
+	} finally {
+		await root.collection('editions').delete(published.id);
+		await root.collection('editions').delete(sibling.id);
+		await root.collection('collections').delete(parent.id);
+	}
+});
+
+integration(
+	'local schema commands require explicit credentials and repair private access safely',
+	async () => {
+		const password = 'local-test-password-only';
+		const run = async (script: string, env: Record<string, string>) => {
+			const command = Bun.spawn([process.execPath, '--no-env-file', script], {
+				env,
+				stdout: 'pipe',
+				stderr: 'pipe'
+			});
+			const output = await new Response(command.stdout).text();
+			const errors = await new Response(command.stderr).text();
+			return { code: await command.exited, output, errors };
+		};
+		for (const script of [
+			'scripts/create-pocketbase-collections.ts',
+			'scripts/fix-access-rules.ts'
+		]) {
+			for (const localOrigin of [origin, 'http://pocketbase:8090']) {
+				const missing = await run(script, {
+					POCKETBASE_URL: localOrigin,
+					POCKETBASE_ADMIN_EMAIL: 'root@example.test'
+				});
+				expect(missing.code).toBe(1);
+				expect(missing.errors).toContain(
+					'Set POCKETBASE_ADMIN_EMAIL and POCKETBASE_ADMIN_PASSWORD explicitly.'
+				);
+			}
+			const remote = await run(script, {
+				POCKETBASE_URL: 'https://example.invalid',
+				POCKETBASE_ADMIN_EMAIL: 'root@example.test',
+				POCKETBASE_ADMIN_PASSWORD: password
+			});
+			expect(remote.code).toBe(1);
+			expect(remote.errors).toContain('restricted to a local PocketBase origin');
+			expect(remote.output + remote.errors).not.toContain(password);
+		}
+		const parent = await root
+			.collection('collections')
+			.create({ title: 'CLI private parent', credits: [credit] });
+		const membership = await root.collection('collectionUsers').create({
+			collection: parent.id,
+			userId: credit.userId,
+			role: 'owner'
+		});
+		const original = await root.collections.getOne('collectionUsers');
+		const visitor = new PocketBase(origin);
+		try {
+			// Reproduce an accidentally public legacy read rule in this disposable database only.
+			await root.collections.update(original.id, { listRule: '', viewRule: '' });
+			expect((await visitor.collection('collectionUsers').getOne(membership.id)).id).toBe(
+				membership.id
+			);
+			const repaired = await run('scripts/fix-access-rules.ts', {
+				POCKETBASE_URL: origin,
+				POCKETBASE_ADMIN_EMAIL: 'root@example.test',
+				POCKETBASE_ADMIN_PASSWORD: password
+			});
+			expect(repaired.code).toBe(0);
+			expect(repaired.errors).toBe('');
+			expect(repaired.output).not.toContain(password);
+			await expect(
+				visitor.collection('collectionUsers').getOne(membership.id)
+			).rejects.toMatchObject({ status: 404 });
+			expect((await author.collection('collectionUsers').getOne(membership.id)).id).toBe(
+				membership.id
+			);
+		} finally {
+			await root.collections.update(original.id, {
+				listRule: original.listRule,
+				viewRule: original.viewRule
+			});
+			await root.collection('collections').delete(parent.id);
+		}
+	}
+);
+
+integration('reviewer status patches cannot bypass unanimous proposal approval', async () => {
+	const secondUser = await root.collection('users').create({
+		email: 'consensus-second@example.test',
+		password: 'local-test-password-only',
+		passwordConfirm: 'local-test-password-only',
+		role: 'user'
+	});
+	const second = new PocketBase(origin);
+	await second.collection('users').authWithPassword(secondUser.email, 'local-test-password-only');
+	const edition = await author.collection('editions').create({
+		title: 'Consensus security regression',
+		credits: [credit]
+	});
+	try {
+		await author.collection('editions').update(edition.id, {
+			...proposalPayload(),
+			status: 'concept_submitted'
+		});
+		await admin.collection('editions').update(edition.id, { status: 'editorial_review' });
+		for (const reviewer of [other, second]) {
+			await admin.collection('reviewAssignments').create({
+				editionId: edition.id,
+				reviewerId: reviewer.authStore.record!.id,
+				reviewStage: 1,
+				status: 'pending'
+			});
+			for (const status of ['concept_accepted', 'concept_rejected'])
+				await expect(
+					reviewer.collection('editions').update(edition.id, { status })
+				).rejects.toMatchObject({ status: 403 });
+		}
+		for (const reviewer of [other, second]) {
+			await reviewer.collection('editionReviews').create({
+				editionId: edition.id,
+				reviewerId: reviewer.authStore.record!.id,
+				reviewStage: 1,
+				decision: 'approve',
+				comment: 'Ready for development.'
+			});
+			expect((await author.collection('editions').getOne(edition.id)).status).toBe(
+				reviewer === other ? 'editorial_review' : 'concept_accepted'
+			);
+		}
+	} finally {
+		for (const name of ['reviewAssignments', 'editionReviews'])
+			for (const record of await root
+				.collection(name)
+				.getFullList({ filter: `editionId = '${edition.id}'` }))
+				await root.collection(name).delete(record.id);
+		await root.collection('editions').delete(edition.id);
+		await root.collection('users').delete(secondUser.id);
+	}
+});
+
+integration(
+	'private memberships, proposal predicates and collection covers stay private',
+	async () => {
+		const visitor = new PocketBase(origin);
+		const collection = await root.collection('collections').create({
+			title: 'Private membership parent',
+			isVisible: false,
+			credits: [credit],
+			coverImage: new File(
+				[
+					Uint8Array.from(
+						atob(
+							'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9X8AAAAASUVORK5CYII='
+						),
+						(c) => c.charCodeAt(0)
+					)
+				],
+				'cover.png',
+				{ type: 'image/png' }
+			)
+		});
+		await root
+			.collection('collectionUsers')
+			.create({ collection: collection.id, userId: author.authStore.record!.id, role: 'owner' });
+		const edition = await author.collection('editions').create({
+			title: 'Private membership edition',
+			collection: collection.id,
+			credits: [credit]
+		});
+		const published = await root.collection('editions').create({
+			title: 'Public credit query',
+			status: 'published',
+			isPublished: true,
+			proposalPurpose: 'Confidential proposal argument',
+			credits: [credit]
+		});
+		await root.collection('editionUsers').create({
+			editionId: published.id,
+			userId: author.authStore.record!.id,
+			role: 'author'
+		});
+		const sandbox = await author.send('/api/pure3d/sandboxes', { method: 'POST', body: {} });
+		try {
+			const collectionMember = (
+				await author.collection('collectionUsers').getFullList({
+					filter: `collection = '${collection.id}'`
+				})
+			)[0];
+			const editionMember = (
+				await author.collection('editionUsers').getFullList({
+					filter: `editionId = '${edition.id}'`
+				})
+			)[0];
+			for (const client of [visitor, other]) {
+				for (const [name, member] of [
+					['collectionUsers', collectionMember],
+					['editionUsers', editionMember]
+				] as const) {
+					await expect(client.collection(name).getOne(member.id)).rejects.toMatchObject({
+						status: 404
+					});
+					expect(
+						await client.collection(name).getFullList({ filter: `id = '${member.id}'` })
+					).toHaveLength(0);
+				}
+			}
+			for (const client of [visitor, other, admin])
+				expect(
+					await client.collection('editionUsers').getFullList({
+						filter: `editionId = '${sandbox.id}'`
+					})
+				).toHaveLength(0);
+			expect(
+				await author.collection('editionUsers').getFullList({
+					filter: `editionId = '${sandbox.id}'`
+				})
+			).toHaveLength(1);
+			const url = author.files.getURL(collection, collection.coverImage);
+			expect((await fetch(url)).status).toBe(403);
+			const outsiderToken = await other.files.getToken();
+			expect((await fetch(url + '?token=' + outsiderToken)).status).toBe(403);
+			const ownerToken = await author.files.getToken();
+			expect((await fetch(url + '?token=' + ownerToken)).status).toBe(200);
+			await author.collection('collections').update(collection.id, { isVisible: true });
+			expect((await fetch(url)).status).toBe(200);
+			expect((await visitor.collection('collectionUsers').getOne(collectionMember.id)).id).toBe(
+				collectionMember.id
+			);
+			expect(
+				await visitor.collection('editionUsers').getFullList({
+					filter: `editionId = '${published.id}'`
+				})
+			).toHaveLength(1);
+			const publicData = await visitor.collection('editions').getOne(published.id);
+			expect(publicData.proposalPurpose).toBeUndefined();
+			for (const options of [
+				{ filter: "proposalPurpose ~ 'Confidential'" },
+				{ sort: 'proposalPurpose' },
+				{ filter: "editionId.proposalPurpose ~ 'Confidential'" },
+				{ filter: "@collection.editions.proposalPurpose ~ 'Confidential'" },
+				{ sort: 'editionId.proposalSnapshot.title' },
+				{ filter: `editionUsers_via_editionId.userId = '${author.authStore.record!.id}'` }
+			]) {
+				const name =
+					options.filter?.startsWith('editionId.') || options.sort?.startsWith('editionId.')
+						? 'editionUsers'
+						: 'editions';
+				for (const client of [visitor, admin])
+					await expect(client.collection(name).getFullList(options)).rejects.toMatchObject({
+						status: 403
+					});
+			}
+			await expect(
+				admin.collection('users').getFullList({
+					filter: 'editionUsers_via_userId.editionId.isSandbox = true'
+				})
+			).rejects.toMatchObject({ status: 403 });
+			expect(
+				(
+					await visitor.collection('editions').getFullList({
+						filter: `isPublished = true && credits ~ '${credit.orcid}'`,
+						sort: 'title'
+					})
+				).some((record) => record.id === published.id)
+			).toBe(true);
+			expect((await author.collection('editions').getOne(published.id)).proposalPurpose).toBe(
+				'Confidential proposal argument'
+			);
+		} finally {
+			await author.collection('editions').delete(sandbox.id);
+			await root.collection('editions').delete(published.id);
+			await root.collection('editions').delete(edition.id);
+			await root.collection('collections').delete(collection.id);
+		}
+	}
+);
+
+integration(
+	'contact throttles concurrent clients atomically without starving other clients',
+	async () => {
+		const settings = await root.settings.getAll();
+		await root.settings.update({
+			smtp: { enabled: true, host: 'smtp.invalid', port: 25 },
+			trustedProxy: { headers: ['X-Test-Client-IP'], useLeftmostIP: true }
+		});
+		const send = (ip: string) =>
+			fetch(origin + '/api/pure3d/contact', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'X-Test-Client-IP': ip },
+				body: JSON.stringify({
+					name: 'Visitor',
+					email: 'visitor@example.test',
+					subject: 'Throttle test',
+					message: 'Hello.'
+				})
+			});
+		try {
+			const burst = await Promise.all(Array.from({ length: 12 }, () => send('192.0.2.1')));
+			expect(burst.filter((response) => response.status === 200)).toHaveLength(1);
+			expect(burst.filter((response) => response.status === 429)).toHaveLength(11);
+			// The first client cannot starve another client by repeatedly consuming global tokens.
+			expect((await send('192.0.2.2')).status).toBe(200);
+			const globalBurst = await Promise.all(
+				Array.from({ length: 12 }, (_, i) => send(`192.0.2.${i + 3}`))
+			);
+			expect(globalBurst.filter((response) => response.status === 200)).toHaveLength(8);
+			expect(globalBurst.filter((response) => response.status === 429)).toHaveLength(4);
+		} finally {
+			await root.settings.update({ smtp: settings.smtp, trustedProxy: settings.trustedProxy });
+		}
+	}
+);
+
+integration('storage deletion fails closed even with matching inventory attributes', async () => {
+	const published = await root.collection('editions').create({
+		title: 'Storage deletion guard',
+		status: 'published',
+		isPublished: true,
+		credits: [credit],
+		sceneDocument: new File(['keep this object'], 'scene.json')
+	});
+	try {
+		const key = `${published.collectionId}/${published.id}/${published.sceneDocument}`;
+		const inventory = await admin.send('/api/pure3d/storage', {
+			query: { prefix: `${published.collectionId}/${published.id}/` }
+		});
+		const object = inventory.objects.find((object: { key: string }) => object.key === key);
+		expect(object).toBeDefined();
+		await expect(
+			admin.send('/api/pure3d/storage', {
+				method: 'DELETE',
+				query: { key, size: object.size, modified: object.modified }
+			})
+		).rejects.toMatchObject({ status: 501 });
+		expect(await (await fetch(root.files.getURL(published, published.sceneDocument))).text()).toBe(
+			'keep this object'
+		);
+	} finally {
+		await root.collection('editions').delete(published.id);
+	}
+});
 
 integration(
 	'edition access reflects membership changes and rejects forged role-cache fields',
@@ -1683,11 +2136,13 @@ integration(
 			await expect(
 				other.collection('reviewAssignments').update(assignment.id, { status: 'completed' })
 			).rejects.toBeDefined();
-			const review = await other.collection('editionReviews').create(verdict); // The UI submits directly from pending.
-			await expect(other.collection('editionReviews').create(verdict)).rejects.toBeDefined();
+			// Accept before submission: the trusted submission hook completes the assignment.
+			// Direct submission from pending is exercised by the unanimous-approval journey.
 			await expect(
 				other.collection('reviewAssignments').update(assignment.id, { status: 'accepted' })
 			).resolves.toBeDefined();
+			const review = await other.collection('editionReviews').create(verdict);
+			await expect(other.collection('editionReviews').create(verdict)).rejects.toBeDefined();
 			await expect(
 				other
 					.collection('reviewAssignments')
@@ -1855,8 +2310,8 @@ integration(
 			).rejects.toBeDefined();
 			// Final drafts, round scoping, release and published locks are exercised in the full workflow test.
 		} finally {
-			await root.collection('editions').delete(edition.id);
-			await root.collection('editions').delete(differentEdition.id);
+			await deleteEditionFixture(edition.id);
+			await deleteEditionFixture(differentEdition.id);
 			await root.collection('users').delete(secondUser.id);
 		}
 	}
@@ -2404,7 +2859,7 @@ integration(
 					.getFullList({ filter: `editionId = '${edition.id}' && type = 'review_submitted'` })
 			).toHaveLength(1);
 		} finally {
-			await root.collection('editions').delete(edition.id);
+			await deleteEditionFixture(edition.id);
 		}
 	}
 );

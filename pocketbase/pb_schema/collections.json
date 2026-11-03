@@ -689,8 +689,8 @@
 				"cascadeDelete": true
 			}
 		],
-		"listRule": "",
-		"viewRule": "",
+		"listRule": "collection.isVisible = true || (@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || collection.collectionUsers_via_collection.userId ?= @request.auth.id))",
+		"viewRule": "collection.isVisible = true || (@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || collection.collectionUsers_via_collection.userId ?= @request.auth.id))",
 		"createRule": "@request.auth.id != ''",
 		"updateRule": "@request.auth.id != ''",
 		"deleteRule": "@request.auth.id != ''",
@@ -742,8 +742,8 @@
 				"cascadeDelete": true
 			}
 		],
-		"listRule": "role != 'reviewer' || @request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || userId = @request.auth.id",
-		"viewRule": "role != 'reviewer' || @request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || userId = @request.auth.id",
+		"listRule": "(role != 'reviewer' || @request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || userId = @request.auth.id) && (editionId.isPublished = true || (@request.auth.id != '' && ((editionId.isSandbox = true && editionId.sandboxOwner = @request.auth.id) || (editionId.isSandbox = false && (@request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || (editionId.editionUsers_via_editionId.userId ?= @request.auth.id && editionId.editionUsers_via_editionId.role ?!= 'reviewer') || (editionId.reviewAssignments_via_editionId.reviewerId ?= @request.auth.id && editionId.reviewAssignments_via_editionId.reviewStage ?= editionId.reviewStage && editionId.reviewAssignments_via_editionId.status ?!= 'declined' && editionId.reviewAssignments_via_editionId.status ?!= 'completed' && (editionId.reviewStage != 2 || editionId.reviewAssignments_via_editionId.reviewRound ?= editionId.alphaReviewRound) && (editionId.reviewStage != 3 || editionId.reviewAssignments_via_editionId.reviewRound ?= editionId.finalReviewRound)) || editionId.collection.collectionUsers_via_collection.userId ?= @request.auth.id)))))",
+		"viewRule": "(role != 'reviewer' || @request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || userId = @request.auth.id) && (editionId.isPublished = true || (@request.auth.id != '' && ((editionId.isSandbox = true && editionId.sandboxOwner = @request.auth.id) || (editionId.isSandbox = false && (@request.auth.role = 'admin' || @request.auth.role = 'editorial_board' || (editionId.editionUsers_via_editionId.userId ?= @request.auth.id && editionId.editionUsers_via_editionId.role ?!= 'reviewer') || (editionId.reviewAssignments_via_editionId.reviewerId ?= @request.auth.id && editionId.reviewAssignments_via_editionId.reviewStage ?= editionId.reviewStage && editionId.reviewAssignments_via_editionId.status ?!= 'declined' && editionId.reviewAssignments_via_editionId.status ?!= 'completed' && (editionId.reviewStage != 2 || editionId.reviewAssignments_via_editionId.reviewRound ?= editionId.alphaReviewRound) && (editionId.reviewStage != 3 || editionId.reviewAssignments_via_editionId.reviewRound ?= editionId.finalReviewRound)) || editionId.collection.collectionUsers_via_collection.userId ?= @request.auth.id)))))",
 		"createRule": "@request.auth.id != ''",
 		"updateRule": "@request.auth.id != ''",
 		"deleteRule": "@request.auth.id != ''",

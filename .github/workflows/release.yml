@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Set up real backend security journeys
+        uses: ./.github/actions/setup-pocketbase
+
       - name: Check
         run: |
           bunx --no-install paraglide-js compile --project ./locale/project.inlang --outdir ./src/lib/paraglide
@@ -77,6 +80,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Set up real backend security journeys
+        uses: ./.github/actions/setup-pocketbase
 
       - name: Configure release identity
         run: |

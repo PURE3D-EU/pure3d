@@ -11,7 +11,7 @@ services:
       PUBLIC_ASSET_BASE_URL: https://127.0.0.1:${FRONTEND_PORT:-60020}/assets
       R2_ENDPOINT: http://minio:9000
       R2_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-pure3d}
-      R2_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-pure3d-local-secret}
+      R2_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?Set a private local MinIO password in .env}
       R2_REGION: us-east-1
       ORCID_ISSUER: https://orcid.org
       ORCID_ENVIRONMENT: production

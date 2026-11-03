@@ -28,7 +28,7 @@
 		);
 	}
 
-	// Reactive data from persisted store
+	// Account-scoped catalogue data remains in memory.
 	let collections = $derived(
 		canShowHiddenCollections && showHiddenCollections
 			? allCollections
@@ -37,7 +37,8 @@
 	let hasCachedData = $derived(($collectionsStore.items ?? []).length > 0);
 	let isLoading = $state(true);
 
-	onMount(async () => {
+	async function loadCollections() {
+		isLoading = true;
 		// If we have fresh cached data, skip loading
 		if (!authStore.isAuthenticated && hasCachedData && !isStale($collectionsStore.lastFetched)) {
 			isLoading = false;
@@ -54,6 +55,11 @@
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	onMount(() => {
+		void loadCollections();
+		return pb.authStore.onChange(() => void loadCollections());
 	});
 
 	// Search state

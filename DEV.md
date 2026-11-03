@@ -15,7 +15,7 @@ Development runs fully locally through Docker/OrbStack:
 - PocketBase: `http://localhost:60021`
 - MinIO S3 API: `http://localhost:60023`
 - MinIO console: `http://localhost:60024`
-- Default MinIO credentials: `pure3d` / `pure3d-local-secret`
+- MinIO user: `pure3d`; set a unique `MINIO_ROOT_PASSWORD` in private `.env`
 - Default bucket: `pure3d-assets`
 
 PocketBase is configured to use MinIO through its S3-compatible storage settings. The setup service applies these settings on `docker compose up`:
@@ -24,7 +24,7 @@ PocketBase is configured to use MinIO through its S3-compatible storage settings
 R2_ENDPOINT=http://minio:9000
 R2_BUCKET=pure3d-assets
 R2_ACCESS_KEY_ID=pure3d
-R2_SECRET_ACCESS_KEY=pure3d-local-secret
+# Local Make commands supply MINIO_ROOT_PASSWORD, never production R2 credentials.
 PUBLIC_ASSET_BASE_URL=http://localhost:60023/pure3d-assets
 ```
 
@@ -33,6 +33,10 @@ Use `http://minio:9000` for PocketBase because it runs inside the Docker network
 ### Install Local Development Services
 
 Run this after cloning, after dependency changes, or after changing local service/storage configuration:
+
+First copy `.env.example` to `.env` and set unique local `POCKETBASE_ADMIN_PASSWORD` and
+`MINIO_ROOT_PASSWORD` values. Compose refuses empty passwords. Never reuse production secrets.
+Services publish only on loopback; do not expose this development stack to a shared network.
 
 ```sh
 make install

@@ -20,6 +20,8 @@ Install [Bun](https://bun.sh/), Docker with Docker Compose, and
 ```sh
 git clone https://github.com/PURE3D-EU/pure3d.git
 cd pure3d
+cp .env.example .env
+# Set unique local POCKETBASE_ADMIN_PASSWORD and MINIO_ROOT_PASSWORD values in .env.
 make dev
 ```
 
@@ -33,6 +35,26 @@ For setup details, asset provisioning, local ORCID sign-in and alternative workf
 
 **Production access is explicit:** `make dev-prod` connects a local frontend to live services;
 changes affect production data. See [Live OVH opt-in](docs/development.md#live-ovh-opt-in).
+
+## Security policies
+
+- Keep credentials, database backups, private assets and service data out of Git. Use private
+  `.env` files and never reuse production credentials for development.
+- Bind local services to loopback and require explicit service passwords. Production access,
+  hook deployment and schema migrations require separate authorisation; frontend releases do
+  not deploy backend protections.
+- Enforce permissions and private-record/file access in PocketBase, not just the UI. Reviewer
+  verdicts follow the review workflow; unsafe raw storage deletion is disabled.
+- Clear private browser state on account changes. Gemini API keys stay in memory and are sent
+  in request headers, not URLs; unowned legacy gallery images are quarantined rather than deleted.
+- Run real-backend security journeys in CI with a checksum-pinned PocketBase binary. Review
+  dependency advisories and verify affected feature workflows; passing checks is not a complete
+  security assessment.
+
+Removing a backup from the current tree does not erase old commits. Historical credential
+exposure needs a reuse assessment, rotation where necessary and separately approved history cleanup.
+See [Security hardening](docs/security-hardening.md) for applied controls, verification evidence,
+remaining advisories and deployment limitations.
 
 ## Documentation
 

@@ -29,6 +29,11 @@ src/lib/paraglide
 
 # PocketBase
 pocketbase/pb_data
+pocketbase/pb_data*.zip
+pocketbase/*.db
+pocketbase/*.db-*
+minio/data/
+*.log
 data
 static/project
 /static/kompakkt/

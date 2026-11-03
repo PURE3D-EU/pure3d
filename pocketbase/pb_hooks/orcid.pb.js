@@ -169,6 +169,22 @@ onRecordEnrich((e) => {
 }, 'editions');
 
 onFileDownloadRequest((e) => {
+	if (!e.record.getBool('isVisible')) {
+		const info = e.requestInfo();
+		if (!info.auth && info.query.token) {
+			try {
+				info.auth = e.app.findAuthRecordByToken(info.query.token, 'file');
+			} catch {
+				throw new ForbiddenError('A valid private-file token is required.');
+			}
+		}
+		if (!e.app.canAccessRecord(e.record, info, e.record.collection().viewRule))
+			throw new ForbiddenError('You do not have access to this private collection file.');
+	}
+	return e.next();
+}, 'collections');
+
+onFileDownloadRequest((e) => {
 	if (
 		e.fileField &&
 		(e.fileField.name.startsWith('proposal') || !e.record.getBool('isPublished'))

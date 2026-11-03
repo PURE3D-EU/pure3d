@@ -91,6 +91,30 @@ make release      # optional explicitly authorised local release fallback
   from any unverified save/publish journey; never claim a schema migration occurred for a
   hook-only deployment.
 
+## Legacy Backup Recovery And Redirects
+
+- Before revisiting the October 2026 website backup or legacy links, read
+  [docs/legacy-backup-recovery.md](docs/legacy-backup-recovery.md) and
+  [docs/legacy-redirects.md](docs/legacy-redirects.md). These contain source paths, migration
+  receipts, known gaps and redirect verification; re-check live state rather than assuming it
+  still matches the historical receipts.
+- Use the published per-project/per-edition `db.json` files in the archive as the public-content
+  source. Its BSON dumps are older test/legacy snapshots, not the current published website.
+- Compare against the target database by `mongoId` and publication coordinates, with titles only
+  as supporting evidence. Import only genuinely missing records and required assets; never
+  overwrite newer content or blindly rerun the local-only bootstrap importer against production.
+- Preserve legacy publication numbers, asset paths, attribution and historical dates. Production
+  writes require fresh explicit authorisation, a verified backup and a reviewed append-only plan.
+  The previous one-off historical publication backfill is not a general ORCID-validation bypass;
+  never invent ORCIDs, account links or review claims, or replay its SQL without fresh review.
+- Published edition links must redirect to the exact edition, not the homepage. Preserve query
+  strings, fragments and direct asset links; do not expose unpublished editions. Keep the old
+  `editions.pure3d.eu` DNS, HTTPS and nginx mapping working, alongside static-site redirects.
+- The agreed fallback for old WordPress posts is the landing page. Keep that fallback separate
+  from edition routing and do not describe it as live until it has actually been verified.
+- Keep private archives, manifests, database snapshots and recovery scripts outside Git. Retain
+  scoped rollback receipts; do not restore an old whole database over subsequent production edits.
+
 ## Conventions
 
 - Use standard British English for all authored user-facing copy, including labels, help text,

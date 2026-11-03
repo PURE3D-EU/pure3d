@@ -19,7 +19,7 @@
 	let allEditions = $derived($editionsStore.items);
 	let hiddenEditionCount = $derived(allEditions.filter((edition) => !edition.isPublished).length);
 
-	// Reactive data from persisted store
+	// Account-scoped catalogue data remains in memory.
 	let editions = $derived(
 		canShowHiddenEditions && showHiddenEditions
 			? allEditions
@@ -28,7 +28,8 @@
 	let hasCachedData = $derived($editionsStore.items.length > 0);
 	let isLoading = $state(true);
 
-	onMount(async () => {
+	async function loadEditions() {
+		isLoading = true;
 		// If we have fresh cached data, skip loading
 		if (!authStore.isAuthenticated && hasCachedData && !isStale($editionsStore.lastFetched)) {
 			isLoading = false;
@@ -42,6 +43,11 @@
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	onMount(() => {
+		void loadEditions();
+		return pb.authStore.onChange(() => void loadEditions());
 	});
 
 	let searchQuery = $state('');

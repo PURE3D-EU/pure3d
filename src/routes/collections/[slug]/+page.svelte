@@ -144,19 +144,19 @@
 		editionManagerLoaded = true;
 		try {
 			const [collectionEditionsResult, allEditionsResult] = await Promise.all([
-				pb.collection('editions').getList(1, 500, {
+				pb.collection('editions').getFullList({
 					sort: 'pubNum,title',
 					filter: `collection = "${collection.id}"`,
 					expand: 'collection'
 				}),
-				pb.collection('editions').getList(1, 500, {
+				pb.collection('editions').getFullList({
 					sort: 'pubNum,title',
 					expand: 'collection'
 				})
 			]);
 
-			editions = collectionEditionsResult.items.map(editionFromRecord) as typeof editions;
-			availableEditions = allEditionsResult.items
+			editions = collectionEditionsResult.map(editionFromRecord) as typeof editions;
+			availableEditions = allEditionsResult
 				.filter((record) => record.collection !== collection.id)
 				.map(editionOptionFromRecord);
 		} catch (e) {

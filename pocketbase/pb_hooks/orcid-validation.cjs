@@ -204,7 +204,8 @@ function canTransition(from, to, roles) {
 		from === 'final_revisions'
 	)
 		return roles.owner || roles.author;
-	return roles.board || roles.reviewer;
+	// Reviewer verdicts go through submitted reviews and trusted consensus, never a status PATCH.
+	return roles.board;
 }
 
 function publicProfile(person, employments) {

@@ -1,0 +1,20 @@
+name: Set up PocketBase security tests
+description: Install the checksum-pinned native backend used by disposable integration journeys
+runs:
+  using: composite
+  steps:
+    - name: Download and verify PocketBase 0.40.3
+      shell: bash
+      run: |
+        set -euo pipefail
+        directory="$(mktemp -d "$RUNNER_TEMP/pure3d-pocketbase.XXXXXX")"
+        archive="$directory/pocketbase.zip"
+        curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+          --connect-timeout 15 --max-time 120 \
+          https://github.com/pocketbase/pocketbase/releases/download/v0.40.3/pocketbase_0.40.3_linux_amd64.zip \
+          --output "$archive"
+        echo "8d81b6b79add0e219373e922ebe1dddbee7f57fcff602e3585e0d2c654b983ce  $archive" | sha256sum --check --strict
+        unzip -q "$archive" pocketbase -d "$directory"
+        chmod 700 "$directory/pocketbase"
+        "$directory/pocketbase" --version
+        echo "PB_TEST_BINARY=$directory/pocketbase" >> "$GITHUB_ENV"
