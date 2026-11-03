@@ -253,34 +253,35 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto max-w-7xl px-4 py-12">
-	<!-- Hero Section -->
-	<div class="mb-12 text-center">
-		<h1 class="mb-4 text-4xl font-bold md:text-5xl">Explore our Collections</h1>
-		<p class="mx-auto max-w-2xl text-lg text-base-content/70">
-			A Virtual Research Environment for 3D Digital Humanities And Heritage
-		</p>
+<div class="container mx-auto max-w-7xl px-4 py-8">
+	<div class="mb-12 flex flex-col gap-6">
+		<div class="order-2 text-center">
+			<h1 class="mb-4 text-4xl font-bold md:text-5xl">Explore our Collections</h1>
+			<p class="mx-auto max-w-2xl text-lg text-base-content/70">
+				A Virtual Research Environment for 3D Digital Humanities And Heritage
+			</p>
+		</div>
 		{#if authStore.globalRole === GlobalRole.Admin}
-			<div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+			<div class="order-1 ml-auto flex flex-none flex-wrap items-center justify-end gap-3">
+				<label
+					class="flex min-h-8 cursor-pointer items-center gap-2 text-xs text-base-content/60 hover:text-base-content"
+				>
+					<input
+						type="checkbox"
+						class="toggle toggle-primary toggle-xs"
+						bind:checked={showHiddenCollections}
+					/>
+					<span>Show hidden and empty</span>
+					{#if hiddenCollectionCount > 0}
+						<span class="tabular-nums">({hiddenCollectionCount})</span>
+					{/if}
+				</label>
 				<button class="btn btn-sm btn-primary" onclick={createCollection} disabled={isCreating}>
 					{#if isCreating}
 						<span class="loading loading-xs loading-spinner"></span>
 					{/if}
 					+ New Collection
 				</button>
-				<label
-					class="flex cursor-pointer items-center gap-2 rounded-full border border-base-300 bg-base-100 px-4 py-2 text-sm shadow-sm"
-				>
-					<input
-						type="checkbox"
-						class="toggle toggle-primary toggle-sm"
-						bind:checked={showHiddenCollections}
-					/>
-					<span>Show hidden and empty</span>
-					{#if hiddenCollectionCount > 0}
-						<span class="badge badge-ghost badge-sm">{hiddenCollectionCount}</span>
-					{/if}
-				</label>
 			</div>
 		{/if}
 	</div>
