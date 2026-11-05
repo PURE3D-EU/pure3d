@@ -139,7 +139,7 @@
 		return $page.url.pathname.startsWith(resolve(href));
 	}
 
-	onMount(() => {
+	$effect(() => {
 		if (!authStore.isAuthenticated) {
 			goto(resolve('/'));
 			return;
@@ -152,117 +152,119 @@
 </script>
 
 <div id="admin-layout" class="flex min-h-[calc(100vh-4rem)] lg:pl-64">
-	<!-- Sidebar -->
-	<aside
-		class="fixed inset-y-0 left-0 z-40 w-64 shrink-0 transform overflow-y-auto border-r border-base-300 bg-base-200 pt-20 transition-transform duration-200 lg:top-[76px] lg:translate-x-0 lg:pt-0"
-		class:translate-x-0={sidebarOpen}
-		class:-translate-x-full={!sidebarOpen}
-	>
-		<div class="p-4">
-			<h2 class="mb-4 text-lg font-bold">Admin</h2>
-			<ul class="menu w-full gap-1">
-				{#each navItems as item (item.href)}
-					<li
-						class:mt-1={item.separatorBefore}
-						class:border-t={item.separatorBefore}
-						class:border-base-300={item.separatorBefore}
-						class:pt-2={item.separatorBefore}
-					>
-						<a
-							href={resolve(item.href)}
-							class="flex items-center gap-3"
-							class:bg-base-300={isNavActive(item.href)}
-							class:font-semibold={isNavActive(item.href)}
-							onclick={() => (sidebarOpen = false)}
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="size-5"
-							>
-								<path stroke-linecap="round" stroke-linejoin="round" d={item.icon} />
-							</svg>
-							{item.label}
-							{#if item.href === '/admin/workflow' && submissionCount > 0}
-								<span
-									class="ml-auto badge badge-sm badge-neutral"
-									aria-label={`${submissionCount} pending submissions`}>{submissionCount}</span
-								>
-							{/if}
-						</a>
-					</li>
-				{/each}
-			</ul>
-		</div>
-	</aside>
-
-	<!-- Backdrop for mobile -->
-	{#if sidebarOpen}
-		<button
-			class="fixed inset-0 z-30 cursor-default border-none bg-black/50 lg:hidden"
-			onclick={() => (sidebarOpen = false)}
-			aria-label="Close sidebar"
-		></button>
-	{/if}
-
-	<!-- Main content -->
-	<main class="min-w-0 flex-1 p-4 lg:p-8">
-		<button
-			class="btn mb-4 gap-2 btn-outline lg:hidden"
-			onclick={() => (sidebarOpen = !sidebarOpen)}
-			aria-label="Toggle admin sidebar"
+	{#if authStore.isAuthenticated && authStore.globalRole === GlobalRole.Admin}
+		<!-- Sidebar -->
+		<aside
+			class="fixed inset-y-0 left-0 z-40 w-64 shrink-0 transform overflow-y-auto border-r border-base-300 bg-base-200 pt-20 transition-transform duration-200 lg:top-[76px] lg:translate-x-0 lg:pt-0"
+			class:translate-x-0={sidebarOpen}
+			class:-translate-x-full={!sidebarOpen}
 		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				class="size-5"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-				/>
-			</svg>
-			Admin menu
-		</button>
-		{#if isContentRoute()}
-			<div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-				<nav
-					class="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-neutral p-1"
-					aria-label="Content sections"
-				>
-					{#each contentTabs as tab (tab.label)}
-						{@const Icon = tab.icon}
-						<!-- eslint-disable svelte/no-navigation-without-resolve -- Resolve the typed route before appending its query string. -->
-						<a
-							class="flex shrink-0 items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors"
-							class:bg-base-100={isContentTabActive(tab)}
-							class:shadow-sm={isContentTabActive(tab)}
-							style:color={isContentTabActive(tab)
-								? 'var(--color-base-content)'
-								: 'var(--color-neutral-content)'}
-							href={`${resolve(tab.href)}${'filter' in tab ? `?filter=${tab.filter}` : ''}`}
-							aria-current={isContentTabActive(tab) ? 'page' : undefined}
+			<div class="p-4">
+				<h2 class="mb-4 text-lg font-bold">Admin</h2>
+				<ul class="menu w-full gap-1">
+					{#each navItems as item (item.href)}
+						<li
+							class:mt-1={item.separatorBefore}
+							class:border-t={item.separatorBefore}
+							class:border-base-300={item.separatorBefore}
+							class:pt-2={item.separatorBefore}
 						>
-							<Icon class="size-4" aria-hidden="true" />
-							{tab.label}
-						</a>
-						<!-- eslint-enable svelte/no-navigation-without-resolve -->
+							<a
+								href={resolve(item.href)}
+								class="flex items-center gap-3"
+								class:bg-base-300={isNavActive(item.href)}
+								class:font-semibold={isNavActive(item.href)}
+								onclick={() => (sidebarOpen = false)}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="1.5"
+									stroke="currentColor"
+									class="size-5"
+								>
+									<path stroke-linecap="round" stroke-linejoin="round" d={item.icon} />
+								</svg>
+								{item.label}
+								{#if item.href === '/admin/workflow' && submissionCount > 0}
+									<span
+										class="ml-auto badge badge-sm badge-neutral"
+										aria-label={`${submissionCount} pending submissions`}>{submissionCount}</span
+									>
+								{/if}
+							</a>
+						</li>
 					{/each}
-				</nav>
-				{#if $page.url.pathname.startsWith(resolve('/admin/pages')) || $page.url.pathname.startsWith(resolve('/admin/posts'))}
-					<button class="btn shrink-0 btn-primary" onclick={() => createContent?.()}>
-						+ New {$page.url.pathname.startsWith(resolve('/admin/posts')) ? 'post' : 'page'}
-					</button>
-				{/if}
+				</ul>
 			</div>
+		</aside>
+
+		<!-- Backdrop for mobile -->
+		{#if sidebarOpen}
+			<button
+				class="fixed inset-0 z-30 cursor-default border-none bg-black/50 lg:hidden"
+				onclick={() => (sidebarOpen = false)}
+				aria-label="Close sidebar"
+			></button>
 		{/if}
-		{@render children?.()}
-	</main>
+
+		<!-- Main content -->
+		<main class="min-w-0 flex-1 p-4 lg:p-8">
+			<button
+				class="btn mb-4 gap-2 btn-outline lg:hidden"
+				onclick={() => (sidebarOpen = !sidebarOpen)}
+				aria-label="Toggle admin sidebar"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					class="size-5"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+					/>
+				</svg>
+				Admin menu
+			</button>
+			{#if isContentRoute()}
+				<div class="mb-8 flex flex-wrap items-center justify-between gap-4">
+					<nav
+						class="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-neutral p-1"
+						aria-label="Content sections"
+					>
+						{#each contentTabs as tab (tab.label)}
+							{@const Icon = tab.icon}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- Resolve the typed route before appending its query string. -->
+							<a
+								class="flex shrink-0 items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors"
+								class:bg-base-100={isContentTabActive(tab)}
+								class:shadow-sm={isContentTabActive(tab)}
+								style:color={isContentTabActive(tab)
+									? 'var(--color-base-content)'
+									: 'var(--color-neutral-content)'}
+								href={`${resolve(tab.href)}${'filter' in tab ? `?filter=${tab.filter}` : ''}`}
+								aria-current={isContentTabActive(tab) ? 'page' : undefined}
+							>
+								<Icon class="size-4" aria-hidden="true" />
+								{tab.label}
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+						{/each}
+					</nav>
+					{#if $page.url.pathname.startsWith(resolve('/admin/pages')) || $page.url.pathname.startsWith(resolve('/admin/posts'))}
+						<button class="btn shrink-0 btn-primary" onclick={() => createContent?.()}>
+							+ New {$page.url.pathname.startsWith(resolve('/admin/posts')) ? 'post' : 'page'}
+						</button>
+					{/if}
+				</div>
+			{/if}
+			{@render children?.()}
+		</main>
+	{/if}
 </div>
