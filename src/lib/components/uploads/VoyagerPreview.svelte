@@ -77,7 +77,7 @@
 		void resolvedFileToken;
 		void collectionPubNum;
 		void editionPubNum;
-		void title;
+		// Title edits update the viewer label, not the loaded scene or camera.
 		const myRun = ++runId;
 		warnMissingModel = false;
 		sceneFallbackError = false;
@@ -434,7 +434,7 @@
 			role="presentation"
 		>
 			<div class="card-body p-0">
-				{#key `${mode}:${previewDocument}:${previewModel}:${previewGeometry}:${title}`}
+				{#key `${mode}:${previewDocument}:${previewModel}:${previewGeometry}`}
 					<VoyagerViewer
 						url={previewRoot}
 						document={previewDocument}
@@ -445,7 +445,7 @@
 						{title}
 						{height}
 						direct={true}
-						uiMode="menu|title|language"
+						uiMode={edition.isSandbox ? 'menu|language' : 'menu|title|language'}
 						showVoyagerMenu={true}
 						voyagerVersion={DEFAULT_VOYAGER_VERSION}
 					/>

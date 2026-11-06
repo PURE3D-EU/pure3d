@@ -113,9 +113,8 @@
 					: '';
 			config = {
 				root,
-				resourceRoot: getVoyagerResourceRoot(
-					edition.settingsAuthorToolVersion || DEFAULT_VOYAGER_VERSION
-				),
+				// Legacy editions may reference runtimes that are no longer bundled.
+				resourceRoot: getVoyagerResourceRoot(DEFAULT_VOYAGER_VERSION),
 				document: edition.sceneDocument
 					? assets[edition.sceneDocument]
 					: root && !edition.modelFile

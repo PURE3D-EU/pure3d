@@ -16,6 +16,8 @@
 	 */
 
 	import { onMount, tick } from 'svelte';
+	import { mountAnimationControls } from '../../../../static/voyager/animation-controls.js';
+	import type { AnimationApplication } from '../../../../static/voyager/animation-controls.js';
 	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { installViewerFetch } from './viewer-fetch';
 	import {
@@ -261,6 +263,7 @@
 	);
 
 	let voyagerElement: CategoryViewer | undefined = $state();
+	let animationHost: HTMLDivElement;
 	let iframeElement: HTMLIFrameElement | undefined = $state();
 	let isScriptLoaded = $state(false);
 	let iframeLoaded = $state(false);
@@ -528,6 +531,13 @@
 			hasError = false;
 			loadingPhase = 'complete';
 			loadingProgress = 100;
+			if (animationHost && voyagerElement?.application) {
+				const animations = mountAnimationControls(
+					voyagerElement.application as AnimationApplication,
+					animationHost
+				);
+				contentScope.defer(() => animations.dispose());
+			}
 
 			// Private assets and scene overrides still need their resolver for later requests.
 			if (cleanupFetchInterceptor && !fetchOverrides?.length && !companionAssets) {
@@ -1810,6 +1820,7 @@
 		</div>
 	{/if}
 
+	{#if direct}<div bind:this={animationHost}></div>{/if}
 	{#if showEditorSwitch}
 		<div class="flex flex-wrap items-center justify-between gap-3 bg-base-100/95 p-3">
 			<div class="join" role="group" aria-label="Voyager mode">

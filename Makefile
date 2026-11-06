@@ -60,7 +60,7 @@ dev-prod:
 		export PUBLIC_DEMO_LOGIN=0; \
 		export PUBLIC_POCKETBASE_URL="https://api.pure3d.eu"; \
 		export PUBLIC_ASSET_BASE_URL="https://api.pure3d.eu/assets"; \
-		bun install && bun run dev --host 127.0.0.1 --port "$${FRONTEND_PORT:-60020}"
+		bun install && bun run dev --host 127.0.0.1 --port "$${FRONTEND_PORT:-60020}" --strictPort
 
 dev-web: dev-cert
 	@$(LOCAL_COMPOSE) up -d minio minio-setup pocketbase pocketbase-setup voyager-setup

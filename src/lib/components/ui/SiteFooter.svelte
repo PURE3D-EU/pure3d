@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { beforeNavigate } from '$app/navigation';
 	import { pb } from '$lib/database/client';
+	import NewsletterSignup from './NewsletterSignup.svelte';
 	import { authStore } from '$lib/database/stores/auth.svelte';
 	import {
 		emptyMenu,
@@ -239,49 +240,50 @@
 			onclose={exitEditor}
 		/>{/if}
 	<div class="mx-auto max-w-7xl">
+		<NewsletterSignup />
 		<details class="footer-navigation" open={editing}>
 			<summary>
 				<span>Explore PURE3D</span>
 				<span class="footer-toggle" aria-hidden="true"></span>
 			</summary>
 			<div class="grid gap-8 pt-8 sm:grid-cols-2 lg:grid-cols-4">
-			{#each items as item (item.id)}<section>
-					<h2 class="text-sm font-semibold">{item.label}</h2>
-					<div class="pt-4">
-						{#if item.landing}<a
-								class="section-link mb-4 inline-block text-sm"
-								href={href(item.landing.href)}
-								>{item.landing.label} <span aria-hidden="true">↗</span></a
-							>{/if}
-						{#if item.direct}<a class="text-sm underline" href={href(item.direct.href)}
-								>{item.direct.label}</a
-							>{:else}{#each item.groups as group (group.id)}
-								{@const headingLink = groupHeadingLink(group)}
-								{@const listedLinks = group.links.filter((link) => link.id !== headingLink?.id)}
-								<div class="mb-5">
-									<h3 class="mb-2 text-xs opacity-60">
-										{#if headingLink}<a class="group-link" href={href(headingLink.href)}
-												>{group.label} <span aria-hidden="true">↗</span></a
-											>{:else}{group.label}{/if}
-									</h3>
-									{#if listedLinks.length}<ul class="space-y-2 text-sm">
-											{#each listedLinks as link (link.id)}<li>
-													<a class="hover:underline" href={href(link.href)}>{link.label}</a>
-												</li>{/each}
-										</ul>{/if}
-								</div>
-							{/each}{/if}
-						{#if item.featured}<aside class="mt-4 rounded-lg border border-base-300 p-4">
-								<p class="text-xs opacity-60">{item.featured.kicker}</p>
-								<p class="my-3 text-2xl tracking-widest">{item.featured.artwork}</p>
-								<h3 class="font-semibold">{item.featured.title}</h3>
-								<p class="my-2 text-sm opacity-60">{item.featured.description}</p>
-								<a class="text-sm underline" href={href(item.featured.link.href)}
-									>{item.featured.link.label}</a
-								>
-							</aside>{/if}
-					</div>
-				</section>{/each}
+				{#each items as item (item.id)}<section>
+						<h2 class="text-sm font-semibold">{item.label}</h2>
+						<div class="pt-4">
+							{#if item.landing}<a
+									class="section-link mb-4 inline-block text-sm"
+									href={href(item.landing.href)}
+									>{item.landing.label} <span aria-hidden="true">↗</span></a
+								>{/if}
+							{#if item.direct}<a class="text-sm underline" href={href(item.direct.href)}
+									>{item.direct.label}</a
+								>{:else}{#each item.groups as group (group.id)}
+									{@const headingLink = groupHeadingLink(group)}
+									{@const listedLinks = group.links.filter((link) => link.id !== headingLink?.id)}
+									<div class="mb-5">
+										<h3 class="mb-2 text-xs opacity-60">
+											{#if headingLink}<a class="group-link" href={href(headingLink.href)}
+													>{group.label} <span aria-hidden="true">↗</span></a
+												>{:else}{group.label}{/if}
+										</h3>
+										{#if listedLinks.length}<ul class="space-y-2 text-sm">
+												{#each listedLinks as link (link.id)}<li>
+														<a class="hover:underline" href={href(link.href)}>{link.label}</a>
+													</li>{/each}
+											</ul>{/if}
+									</div>
+								{/each}{/if}
+							{#if item.featured}<aside class="mt-4 rounded-lg border border-base-300 p-4">
+									<p class="text-xs opacity-60">{item.featured.kicker}</p>
+									<p class="my-3 text-2xl tracking-widest">{item.featured.artwork}</p>
+									<h3 class="font-semibold">{item.featured.title}</h3>
+									<p class="my-2 text-sm opacity-60">{item.featured.description}</p>
+									<a class="text-sm underline" href={href(item.featured.link.href)}
+										>{item.featured.link.label}</a
+									>
+								</aside>{/if}
+						</div>
+					</section>{/each}
 			</div>
 		</details>
 		<div

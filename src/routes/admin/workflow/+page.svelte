@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { workflowAnchor } from '$lib/workflow/presentation';
+	import { workflowAnchor, workflowStages } from '$lib/workflow/presentation';
 	import type { RecordModel } from 'pocketbase';
 	import { onMount } from 'svelte';
 	import { base, resolve } from '$app/paths';
@@ -63,9 +63,7 @@
 	);
 
 	let isLoading = $state(true);
-	let activeTab = $state<'submissions' | 'editorial' | 'alpha' | 'final' | 'publish' | 'all'>(
-		'submissions'
-	);
+	let activeTab = $state<EditionStatus | 'all'>(EditionStatus.ConceptSubmitted);
 	let searchQuery = $state('');
 	let collectionFilter = $state('');
 	let expandedId = $state<string | null>(null);
@@ -107,46 +105,17 @@
 	// Publish modal state
 	let publishModalEdition = $state<WfEdition | null>(null);
 
-	// Filtered editions per tab
-	let submissions = $derived(
-		filteredBaseEditions.filter((e) => e.status === EditionStatus.ConceptSubmitted)
+	// The pipeline and timeline share the same labels, order and status membership.
+	let stageTabs = $derived(
+		workflowStages.map((stage) => ({
+			...stage,
+			editions: filteredBaseEditions.filter((edition) => stage.statuses.includes(edition.status))
+		}))
 	);
-	let editorialEditions = $derived(
-		filteredBaseEditions.filter((e) => e.status === EditionStatus.EditorialReview)
+	let selectedStage = $derived(stageTabs.find((stage) => stage.hrefStatus === activeTab));
+	let visibleEditions = $derived(
+		activeTab === 'all' ? filteredBaseEditions : selectedStage?.editions ?? []
 	);
-	let alphaEditions = $derived(
-		filteredBaseEditions.filter(
-			(e) =>
-				e.status === EditionStatus.ConceptAccepted ||
-				e.status === EditionStatus.AlphaReview ||
-				e.status === EditionStatus.AlphaRevisions
-		)
-	);
-	let finalEditions = $derived(
-		filteredBaseEditions.filter(
-			(e) =>
-				e.status === EditionStatus.AlphaAccepted ||
-				e.status === EditionStatus.FinalReview ||
-				e.status === EditionStatus.FinalRevisions ||
-				e.status === EditionStatus.FinalAccepted
-		)
-	);
-	let publishEditions = $derived(
-		filteredBaseEditions.filter(
-			(e) => e.status === EditionStatus.Published || e.status === EditionStatus.PublicationRequested
-		)
-	);
-	let allEditions = $derived(filteredBaseEditions);
-
-	// Tab counts
-	let tabCounts = $derived({
-		submissions: submissions.length,
-		editorial: editorialEditions.length,
-		alpha: alphaEditions.length,
-		final: finalEditions.length,
-		publish: publishEditions.length,
-		all: allEditions.length
-	});
 
 	const overrideTargets: Partial<Record<EditionStatus, EditionStatus[]>> = {
 		[EditionStatus.Draft]: [EditionStatus.ConceptSubmitted],
@@ -572,7 +541,8 @@
 	function cardCue(status: EditionStatus): string {
 		if (status === EditionStatus.ConceptSubmitted) return 'Assign for review';
 		if (status === EditionStatus.EditorialReview) return 'Review progress';
-		if ([EditionStatus.ConceptAccepted, EditionStatus.AlphaReview, EditionStatus.AlphaRevisions].includes(status))
+		if (status === EditionStatus.ConceptAccepted) return 'Prepare edition';
+		if ([EditionStatus.AlphaReview, EditionStatus.AlphaRevisions].includes(status))
 			return 'Manage Alpha';
 		if (
 			[
@@ -630,59 +600,27 @@
 
 	<!-- Tabs -->
 	<div class="workflow-tabs mb-6 tabs border-b border-base-300">
-		<button
-			class="tab"
-			class:tab-active={activeTab === 'submissions'}
-			class:font-semibold={activeTab === 'submissions'}
-			onclick={() => (activeTab = 'submissions')}
-		>
-			Submissions
-			<span class="ml-1 badge badge-sm" class:badge-neutral={tabCounts.submissions > 0}>{tabCounts.submissions}</span>
-		</button>
-		<button
-			class="tab"
-			class:tab-active={activeTab === 'editorial'}
-			class:font-semibold={activeTab === 'editorial'}
-			onclick={() => (activeTab = 'editorial')}
-		>
-			Editorial
-			<span class="ml-1 badge badge-sm" class:badge-neutral={tabCounts.editorial > 0}>{tabCounts.editorial}</span>
-		</button>
-		<button
-			class="tab"
-			class:tab-active={activeTab === 'alpha'}
-			class:font-semibold={activeTab === 'alpha'}
-			onclick={() => (activeTab = 'alpha')}
-		>
-			Alpha
-			<span class="ml-1 badge badge-sm" class:badge-neutral={tabCounts.alpha > 0}>{tabCounts.alpha}</span>
-		</button>
-		<button
-			class="tab"
-			class:tab-active={activeTab === 'final'}
-			class:font-semibold={activeTab === 'final'}
-			onclick={() => (activeTab = 'final')}
-		>
-			Final
-			<span class="ml-1 badge badge-sm" class:badge-neutral={tabCounts.final > 0}>{tabCounts.final}</span>
-		</button>
-		<button
-			class="tab"
-			class:tab-active={activeTab === 'publish'}
-			class:font-semibold={activeTab === 'publish'}
-			onclick={() => (activeTab = 'publish')}
-		>
-			Publish
-			<span class="ml-1 badge badge-sm" class:badge-neutral={tabCounts.publish > 0}>{tabCounts.publish}</span>
-		</button>
+		{#each stageTabs as stage (stage.hrefStatus)}
+			<button
+				class="tab"
+				class:tab-active={activeTab === stage.hrefStatus}
+				class:font-semibold={activeTab === stage.hrefStatus}
+				aria-pressed={activeTab === stage.hrefStatus}
+				onclick={() => (activeTab = stage.hrefStatus)}
+			>
+				{stage.label}
+				<span class="ml-1 badge badge-sm" class:badge-neutral={stage.editions.length > 0}>{stage.editions.length}</span>
+			</button>
+		{/each}
 		<button
 			class="tab"
 			class:tab-active={activeTab === 'all'}
 			class:font-semibold={activeTab === 'all'}
+			aria-pressed={activeTab === 'all'}
 			onclick={() => (activeTab = 'all')}
 		>
 			All
-			<span class="ml-1 badge badge-sm" class:badge-neutral={tabCounts.all > 0}>{tabCounts.all}</span>
+			<span class="ml-1 badge badge-sm" class:badge-neutral={filteredBaseEditions.length > 0}>{filteredBaseEditions.length}</span>
 		</button>
 	</div>
 
@@ -690,96 +628,30 @@
 		<div class="flex items-center justify-center py-12">
 			<span class="loading loading-lg loading-spinner"></span>
 		</div>
+	{:else if visibleEditions.length === 0}
+		<p class="py-8 text-center text-base-content/60">
+			{activeTab === 'all'
+				? 'No editions match the selected filters.'
+				: `No editions in ${selectedStage?.label ?? 'this step'} match the selected filters.`}
+		</p>
 	{:else}
-		<!-- Submissions Tab -->
-		{#if activeTab === 'submissions'}
-			{#if submissions.length === 0}
-				<p class="py-8 text-center text-base-content/60">No pending submissions.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each submissions as edition (edition.id)}
-						{@render editionCard(edition, ReviewStage.Concept, true)}
-					{/each}
-				</div>
-			{/if}
-		{/if}
-
-		<!-- Editorial Review Tab -->
-		{#if activeTab === 'editorial'}
-			{#if editorialEditions.length === 0}
-				<p class="py-8 text-center text-base-content/60">No editions in editorial review.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each editorialEditions as edition (edition.id)}
-						{@render editionCard(edition, ReviewStage.Concept, false)}
-					{/each}
-				</div>
-			{/if}
-		{/if}
-
-		<!-- Alpha Review Tab -->
-		{#if activeTab === 'alpha'}
-			{#if alphaEditions.length === 0}
-				<p class="py-8 text-center text-base-content/60">No editions in alpha review.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each alphaEditions as edition (edition.id)}
-						{@render editionCard(edition, ReviewStage.Alpha, false)}
-					{/each}
-				</div>
-			{/if}
-		{/if}
-
-		<!-- Final Review Tab -->
-		{#if activeTab === 'final'}
-			{#if finalEditions.length === 0}
-				<p class="py-8 text-center text-base-content/60">No editions in final review.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each finalEditions as edition (edition.id)}
-						{@render editionCard(edition, ReviewStage.Final, false)}
-					{/each}
-				</div>
-			{/if}
-		{/if}
-
-		<!-- Publish Tab -->
-		{#if activeTab === 'publish'}
-			{#if publishEditions.length === 0}
-				<p class="py-8 text-center text-base-content/60">No editions ready to publish.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each publishEditions as edition (edition.id)}
-						{@render publishCard(edition)}
-					{/each}
-				</div>
-			{/if}
-		{/if}
-
-		<!-- All Tab -->
-		{#if activeTab === 'all'}
-			{#if allEditions.length === 0}
-				<p class="py-8 text-center text-base-content/60">No editions match the selected filters.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each allEditions as edition (edition.id)}
-						{#if [EditionStatus.PublicationRequested, EditionStatus.Published].includes(edition.status)}
-							{@render publishCard(edition)}
-						{:else}
-							{@render editionCard(
-								edition,
-								edition.status.startsWith('final')
-									? ReviewStage.Final
-									: edition.status.startsWith('alpha')
-										? ReviewStage.Alpha
-										: ReviewStage.Concept,
-								edition.status === EditionStatus.ConceptSubmitted
-							)}
-						{/if}
-					{/each}
-				</div>
-			{/if}
-		{/if}
+		<div class="space-y-2">
+			{#each visibleEditions as edition (edition.id)}
+				{#if [EditionStatus.PublicationRequested, EditionStatus.Published].includes(edition.status)}
+					{@render publishCard(edition)}
+				{:else}
+					{@render editionCard(
+						edition,
+						edition.status.startsWith('final')
+							? ReviewStage.Final
+							: edition.status.startsWith('alpha')
+								? ReviewStage.Alpha
+								: ReviewStage.Concept,
+						edition.status === EditionStatus.ConceptSubmitted
+					)}
+				{/if}
+			{/each}
+		</div>
 	{/if}
 </div>
 
@@ -1049,10 +921,21 @@
 	{/if}
 {/snippet}
 
+{#snippet openEditionLink(edition: WfEdition)}
+	<a
+		class="btn btn-outline btn-sm shrink-0"
+		href={resolve('/editions/[slug]', { slug: edition.id })}
+		aria-label={`Open edition: ${edition.title}`}
+	>
+		Open edition
+	</a>
+{/snippet}
+
 {#snippet publishCard(edition: WfEdition)}
 	<div class="overflow-hidden rounded-box border border-base-300 bg-base-100">
+		<div class="flex items-center bg-base-200/50 pr-4">
 		<button
-			class="flex w-full cursor-pointer items-center justify-between bg-base-200/50 p-4 font-medium"
+			class="flex min-w-0 flex-1 cursor-pointer items-center justify-between p-4 font-medium"
 			onclick={() => toggleExpand(edition.id)}
 			aria-expanded={expandedId === edition.id}
 		>
@@ -1069,6 +952,8 @@
 				{edition.status === EditionStatus.Published ? 'View publication' : 'Review readiness'}
 			</span>
 		</button>
+		{@render openEditionLink(edition)}
+		</div>
 		{#if expandedId === edition.id}
 			{@const finalAssignments = editionAssignments(edition.id, ReviewStage.Final).filter(
 				(assignment) => assignment.status !== ReviewAssignmentStatus.Declined
@@ -1155,8 +1040,9 @@
 
 {#snippet editionCard(edition: WfEdition, stage: ReviewStage, isSubmission: boolean)}
 	<div class="overflow-hidden rounded-box border border-base-300 bg-base-100">
+		<div class="flex items-center bg-base-200/50 pr-4">
 		<button
-			class="flex w-full cursor-pointer items-center justify-between bg-base-200/50 p-4 font-medium"
+			class="flex min-w-0 flex-1 cursor-pointer items-center justify-between p-4 font-medium"
 			onclick={() => toggleExpand(edition.id)}
 			aria-expanded={expandedId === edition.id}
 		>
@@ -1181,7 +1067,7 @@
 					<div class="mt-1 text-sm font-normal text-base-content/60">
 						{edition.authorNames || 'Authors unavailable'}
 						<span aria-hidden="true"> · </span>
-						{STATUS_LABELS[edition.status]}
+						{edition.status === EditionStatus.ConceptAccepted ? 'Draft' : STATUS_LABELS[edition.status]}
 					</div>
 				</div>
 				<span class="ml-4 flex shrink-0 items-center gap-2 text-sm text-base-content/70">
@@ -1189,6 +1075,8 @@
 				</span>
 			{/if}
 		</button>
+		{@render openEditionLink(edition)}
+		</div>
 
 		{#if expandedId === edition.id}
 			{@const assignments = editionAssignments(edition.id, stage)}
@@ -1337,7 +1225,9 @@
 						</section>
 						{@render editionSummary(
 							edition,
-							edition.status === EditionStatus.EditorialReview
+							edition.status === EditionStatus.ConceptAccepted
+								? 'Open draft edition'
+								: edition.status === EditionStatus.EditorialReview
 								? 'Open editorial review details'
 								: stage === ReviewStage.Alpha
 									? 'Open Alpha workflow details'

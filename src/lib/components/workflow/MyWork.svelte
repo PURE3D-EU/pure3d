@@ -341,7 +341,11 @@
 	}
 </script>
 
-<section id="my-work" class="mt-10 rounded-box border border-base-300 bg-base-100 p-6 shadow-sm">
+<section
+	id="my-work"
+	class="mt-10 rounded-box border border-base-300 bg-base-100 p-6 shadow-sm"
+	class:sandbox-active={activeTab === 'sandboxes'}
+>
 	<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
 		<div>
 			<h2 class="text-2xl font-bold">My Work</h2>
@@ -664,6 +668,24 @@
 				<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					{#each mySandboxes as sandbox (sandbox.id)}
 						<article class="ds-card flex min-w-0 flex-col p-4">
+							<a
+								href={resolve('/editions/[slug]/workflow', { slug: sandbox.id })}
+								class="relative mb-3 block aspect-square overflow-hidden rounded-lg bg-base-200"
+								aria-label={`Open editor for ${sandbox.title || 'Untitled Sandbox'}`}
+							>
+								{#if sandbox.thumbnail}
+									<img
+										src={sandbox.thumbnail}
+										alt={sandbox.title}
+										class="h-full w-full object-cover"
+										loading="lazy"
+									/>
+								{:else}
+									<div class="flex h-full items-center justify-center text-base-content/30">
+										<SandboxIcon class="size-16" aria-hidden="true" />
+									</div>
+								{/if}
+							</a>
 							<div class="mb-3 flex items-start justify-between gap-3">
 								<div>
 									<span class="badge badge-outline badge-sm">Private sandbox</span>
@@ -695,3 +717,23 @@
 		{/if}
 	{/if}
 </section>
+
+<style>
+	.sandbox-active {
+		background-color: color-mix(in srgb, var(--color-base-100) 85%, #edc786);
+		background-image: url('/images/sandbox-doodles.svg'), url('/images/sandbox-grains.svg');
+		background-position: right bottom, left top;
+		background-size: 440px auto, 120px 120px;
+		background-repeat: no-repeat, repeat;
+	}
+
+	.sandbox-active :global(.ds-card) {
+		background-color: var(--color-base-100);
+	}
+
+	@media (max-width: 640px) {
+		.sandbox-active {
+			background-size: 280px auto, 120px 120px;
+		}
+	}
+</style>

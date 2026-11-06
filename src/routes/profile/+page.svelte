@@ -8,6 +8,7 @@
 	import EditionCard from '$lib/components/cards/EditionCard.svelte';
 	import CollectionCard from '$lib/components/cards/CollectionCard.svelte';
 	import MyWork from '$lib/components/workflow/MyWork.svelte';
+	import NewsletterSignup from '$lib/components/ui/NewsletterSignup.svelte';
 	import IconPencil from '~icons/lucide/pencil';
 	import {
 		getCollectionThumbnailUrl,
@@ -617,6 +618,10 @@
 			</section>
 
 			<MyWork />
+
+			<div class="mt-8">
+				<NewsletterSignup id="profile-newsletter" email={profileData.email} framed />
+			</div>
 
 			<section class="mt-10">
 				<div class="mb-4 flex items-center justify-between">

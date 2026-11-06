@@ -3,6 +3,7 @@
 	import { base, resolve } from '$app/paths';
 	import CollectionCard from '$lib/components/cards/CollectionCard.svelte';
 	import HomeOpenCalls from '$lib/components/content/HomeOpenCalls.svelte';
+	import NewsletterSignup from '$lib/components/ui/NewsletterSignup.svelte';
 	import { pb } from '$lib/database/client';
 	import { homeStore, fetchHomeData, isStale } from '$lib/stores/data.store';
 	import ParticleHero from './ParticleHero.svelte';
@@ -430,6 +431,12 @@
 					</div>
 				</div>
 			</div>
+		</div>
+	</section>
+
+	<section class="newsletter" aria-label="Newsletter">
+		<div class="shell">
+			<NewsletterSignup id="home-newsletter" framed />
 		</div>
 	</section>
 

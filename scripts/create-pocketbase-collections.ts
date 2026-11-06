@@ -11,6 +11,7 @@ import {
 	planFeedbackEmailQueueSchema
 } from './feedback-email-queue-schema';
 import schema from '../pocketbase/pb_schema/collections.json';
+import { ensureNewsletter } from './newsletter-schema';
 
 const POCKETBASE_URL = process.env.POCKETBASE_URL || 'http://localhost:60021';
 const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || '';
@@ -686,6 +687,7 @@ async function main() {
 	// Keep ORCID fields and authorization identical to the focused configuration command.
 	// OAuth credentials and password/OTP changes require configure-orcid.ts --apply.
 	await alignOrcidSchema(pb);
+	await ensureNewsletter(pb);
 
 	// Configure S3-compatible storage only when all four R2_* env vars are present.
 	// Per-field `maxSize` on file fields gates upload sizes (PocketBase v0.22+

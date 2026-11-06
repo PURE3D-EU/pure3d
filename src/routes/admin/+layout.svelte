@@ -78,6 +78,12 @@
 			icon: 'm3 11 18-5v12L3 14v-3Zm3.2 3.8L8 21h5l-1.4-4.2M8 6.8v8.4'
 		},
 		{
+			label: 'Newsletter',
+			href: '/admin/newsletter',
+			separatorBefore: false,
+			icon: 'M3 5h18v14H3zM3 5l9 7 9-7'
+		},
+		{
 			label: 'Workflow',
 			href: '/admin/workflow',
 			icon: 'M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75',
@@ -151,11 +157,11 @@
 	});
 </script>
 
-<div id="admin-layout" class="flex min-h-[calc(100vh-4rem)] lg:pl-64">
+<div id="admin-layout" class="flex min-h-[calc(100vh-4rem)]">
 	{#if authStore.isAuthenticated && authStore.globalRole === GlobalRole.Admin}
 		<!-- Sidebar -->
 		<aside
-			class="fixed inset-y-0 left-0 z-40 w-64 shrink-0 transform overflow-y-auto border-r border-base-300 bg-base-200 pt-20 transition-transform duration-200 lg:top-[76px] lg:translate-x-0 lg:pt-0"
+			class="fixed inset-y-0 left-0 z-40 w-64 shrink-0 transform overflow-y-auto border-r border-base-300 bg-base-200 pt-20 transition-transform duration-200 lg:sticky lg:inset-y-auto lg:top-[76px] lg:h-[calc(100dvh-76px)] lg:self-start lg:translate-x-0 lg:pt-0"
 			class:translate-x-0={sidebarOpen}
 			class:-translate-x-full={!sidebarOpen}
 		>

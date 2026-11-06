@@ -16,13 +16,17 @@
 			#loading {
 				padding: 24px;
 			}
+			body { display: flex; flex-direction: column; }
+			voyager-story { position: relative; display: block; flex: 1; min-height: 0; }
 		</style>
 	</head>
 	<body>
 		<p id="loading">Loading Voyager Story…</p>
-		<script>
+		<script type="module">
+			import { mountAnimationControls } from './animation-controls.js';
 			const session = new URLSearchParams(location.search).get('session');
 			let app;
+			let animations;
 			let started = false;
 			const send = (type, data = {}) =>
 				parent.postMessage({ type, session, ...data }, location.origin);
@@ -109,8 +113,15 @@
 						app.setBaseUrl(root || location.origin + '/');
 						const StoryView = customElements.get('voyager-story');
 						const view = new StoryView(app);
-						view.style.height = '100%';
+						view.style.height = '0';
+						view.style.position = 'relative';
 						document.body.append(view);
+						const animationHost = document.createElement('div');
+						document.body.insertBefore(animationHost, view);
+						animations = mountAnimationControls(app, animationHost, {
+							editable: true,
+							onchange: () => send('dirty')
+						});
 						if (scene && title) {
 							const response = await window.fetch(scene);
 							if (!response.ok) throw new Error(`Could not load scene (${response.status}).`);
@@ -130,11 +141,13 @@
 						}
 						if (!app.documentProvider?.activeComponent?.deflateDocument)
 							throw new Error('This Voyager version cannot save scenes through the editor.');
+						animations.refresh();
 						send('ready');
 						// Mark interactions as potentially unsaved; never discard scene work silently.
 						for (const type of ['input', 'change', 'pointerdown'])
 							document.addEventListener(type, () => send('dirty'), { capture: true });
 					} else if (event.data.type === 'export' && app) {
+						animations?.prepareSave();
 						await new Promise(requestAnimationFrame);
 						send('document', { document: app.documentProvider.activeComponent.deflateDocument() });
 					}
@@ -142,6 +155,7 @@
 					send('error', { message: error.message || 'Scene editor failed.' });
 				}
 			});
+			addEventListener('pagehide', () => animations?.dispose(), { once: true });
 		</script>
 	</body>
 </html>
