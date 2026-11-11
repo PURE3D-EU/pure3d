@@ -7,13 +7,22 @@
 		editionId: string;
 		language: string;
 		root: string;
+		assets?: Record<string, string>;
 		activeArticleId: string | null;
 		linkedArticleId: string | null;
 		onArticle: (id: string | null) => void;
 	}
 
-	let { articles, editionId, language, root, activeArticleId, linkedArticleId, onArticle }: Props =
-		$props();
+	let {
+		articles,
+		editionId,
+		language,
+		root,
+		assets = {},
+		activeArticleId,
+		linkedArticleId,
+		onArticle
+	}: Props = $props();
 	let content = $state('');
 	let loading = $state(false);
 	let error = $state('');
@@ -42,7 +51,8 @@
 				return response.text();
 			})
 			.then((html) => {
-				if (!controller.signal.aborted) content = prepareVoyagerArticle(html, url, article.title);
+				if (!controller.signal.aborted)
+					content = prepareVoyagerArticle(html, url, article.title, assets);
 			})
 			.catch((reason: unknown) => {
 				if (

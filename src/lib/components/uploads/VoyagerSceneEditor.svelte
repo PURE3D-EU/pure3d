@@ -35,7 +35,14 @@
 	let error = $state('');
 	let session = '';
 	let config: Record<string, unknown>;
-	let pending: { resolve: (document: object) => void; reject: (error: Error) => void } | undefined;
+	type SceneExport = {
+		document: object;
+		files: { path: string; original: string | null; file: File }[];
+	};
+	let expectedFiles: { sceneDocument: string; modelFile: string; modelAssets: string[] };
+	let pending:
+		| { resolve: (value: SceneExport) => void; reject: (error: Error) => void }
+		| undefined;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	function originalFilename(filename: string) {
 		let name = filename;
@@ -60,14 +67,16 @@
 				return;
 			if (event.data.type === 'ready') ready = true;
 			if (event.data.type === 'dirty') dirty = true;
+			if (event.data.type === 'save-request') void save();
 			if (event.data.type === 'error') {
 				error = event.data.message || 'Scene editor failed.';
+				clearTimeout(timeout);
 				pending?.reject(new Error(error));
 				pending = undefined;
 			}
 			if (event.data.type === 'document' && pending) {
 				clearTimeout(timeout);
-				pending.resolve(event.data.document);
+				pending.resolve({ document: event.data.document, files: event.data.files || [] });
 				pending = undefined;
 			}
 		};
@@ -92,22 +101,37 @@
 		ready = false;
 		dirty = false;
 		try {
-			const token = edition.isPublished ? '' : await pb.files.getToken();
+			const capability = await pb
+				.send<{ protocol: string }>('/api/pure3d/voyager/save-capability', {
+					method: 'GET'
+				})
+				.catch(() => null);
+			if (capability?.protocol !== 'scene-and-assets-v1')
+				throw new Error(
+					'The backend Voyager saving update must be installed before scene editing is available.'
+				);
+			const current = await pb.collection('editions').getOne(edition.id);
+			expectedFiles = {
+				sceneDocument: current.sceneDocument || '',
+				modelFile: current.modelFile || '',
+				modelAssets: current.modelAssets || []
+			};
+			const token = current.isPublished ? '' : await pb.files.getToken();
 			const files = [
-				edition.modelFile,
-				edition.sceneDocument,
-				...(edition.modelAssets || [])
+				current.modelFile,
+				current.sceneDocument,
+				...(current.modelAssets || [])
 			].filter(Boolean) as string[];
 			const assets: Record<string, string> = {};
 			for (const filename of files) {
-				const url = pb.files.getURL(edition, filename, { token });
+				const url = pb.files.getURL(current, filename, { token });
 				assets[filename] = url;
 				assets[originalFilename(filename)] = url;
 			}
 			const root = files.length
 				? pb.files
-						.getURL(edition, files[0])
-						.slice(0, pb.files.getURL(edition, files[0]).lastIndexOf('/') + 1)
+						.getURL(current, files[0])
+						.slice(0, pb.files.getURL(current, files[0]).lastIndexOf('/') + 1)
 				: collectionPubNum && editionPubNum
 					? getEditionRoot(collectionPubNum, editionPubNum)
 					: '';
@@ -115,14 +139,15 @@
 				root,
 				// Legacy editions may reference runtimes that are no longer bundled.
 				resourceRoot: getVoyagerResourceRoot(DEFAULT_VOYAGER_VERSION),
-				document: edition.sceneDocument
-					? assets[edition.sceneDocument]
-					: root && !edition.modelFile
-						? edition.settingsSceneFile || 'scene.svx.json'
+				document: current.sceneDocument
+					? assets[current.sceneDocument]
+					: root && !current.modelFile
+						? current.settingsSceneFile || 'scene.svx.json'
 						: '',
-				model: edition.modelFile ? assets[edition.modelFile] : '',
+				model: current.modelFile ? assets[current.modelFile] : '',
 				title,
-				assets
+				assets,
+				companionFiles: expectedFiles.modelAssets
 			};
 			session = crypto.randomUUID();
 			src = `${base}/voyager/alpha-story.html?session=${session}`;
@@ -144,8 +169,17 @@
 		const root = String(config.root || '');
 		return JSON.parse(
 			JSON.stringify(document, (key, value) => {
-				if (key === 'uri' && typeof value === 'string' && root && value.startsWith(root))
-					return new URL(value).pathname.split('/').pop();
+				if (typeof value === 'string' && root && value.startsWith(root)) {
+					const url = new URL(value);
+					url.searchParams.delete('token');
+					for (const [name, value] of [...url.searchParams])
+						if (/^\d+$/.test(name) && !value) url.searchParams.delete(name);
+					return (
+						decodeURIComponent(url.pathname.slice(new URL(root).pathname.length)) +
+						url.search +
+						url.hash
+					);
+				}
 				return value;
 			})
 		);
@@ -155,7 +189,7 @@
 		saving = true;
 		error = '';
 		try {
-			const document = await new Promise<object>((resolve, reject) => {
+			const { document, files } = await new Promise<SceneExport>((resolve, reject) => {
 				pending = { resolve, reject };
 				timeout = setTimeout(() => {
 					pending = undefined;
@@ -170,7 +204,21 @@
 				!('scenes' in document)
 			)
 				throw new Error('Voyager returned an invalid scene.');
+			if (
+				!Array.isArray(files) ||
+				files.length > 100 ||
+				files.some((item) => !(item.file instanceof File))
+			)
+				throw new Error('Voyager returned invalid article or media files.');
 			const form = new FormData();
+			form.append(
+				'voyagerSave',
+				JSON.stringify({
+					expectedFiles,
+					assets: files.map(({ path, original }) => ({ path, original }))
+				})
+			);
+			for (const item of files) form.append('modelAssets+', item.file);
 			form.append(
 				'sceneDocument',
 				new File([JSON.stringify(persistentScene(document))], 'scene.svx.json', {
@@ -193,8 +241,20 @@
 
 <div id="voyager-scene-editor" class="space-y-2">
 	<button type="button" class="btn btn-accent" {disabled} onclick={open}>
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-5" aria-hidden="true">
-			<path stroke-linecap="round" stroke-linejoin="round" d="m12 3 9 5v8l-9 5-9-5V8l9-5Zm0 9 9-4M12 12 3 8m9 4v9" />
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.5"
+			class="size-5"
+			aria-hidden="true"
+		>
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				d="m12 3 9 5v8l-9 5-9-5V8l9-5Zm0 9 9-4M12 12 3 8m9 4v9"
+			/>
 		</svg>
 		{edition.sceneDocument || edition.settingsSceneFile
 			? 'Edit scene in Voyager Story'
@@ -226,6 +286,9 @@
 					>
 				</div>
 			</div>
+			<p class="mb-2 text-sm text-base-content/70">
+				Article and media changes are kept in this editor until you choose Save scene &amp; close.
+			</p>
 			{#if error}<p role="alert" class="mb-2 rounded-box bg-error/10 p-2 text-sm text-base-content">
 					{error}
 				</p>{/if}{#if src}<iframe

@@ -2,7 +2,12 @@ import { pb } from '../client';
 import { browser } from '$app/environment';
 import { GlobalRole } from '$lib/types/roles';
 import { notificationStore } from './notifications.svelte';
-import { ClientResponseError, getTokenPayload, type RecordModel } from 'pocketbase';
+import {
+	ClientResponseError,
+	getTokenPayload,
+	type RecordModel,
+	type SendOptions
+} from 'pocketbase';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import toast from 'svelte-french-toast';
@@ -43,7 +48,7 @@ class AuthStore {
 				}
 				return { url, options };
 			};
-			pb.afterSend = async (response, data, options) => {
+			pb.afterSend = async (response, data, options?: SendOptions) => {
 				const token = pb.authStore.token;
 				const requestToken = new Headers(options?.headers).get('Authorization');
 				// Ignore anonymous requests and responses belonging to an older login.

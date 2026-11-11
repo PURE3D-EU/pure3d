@@ -16,8 +16,16 @@
 			#loading {
 				padding: 24px;
 			}
-			body { display: flex; flex-direction: column; }
-			voyager-story { position: relative; display: block; flex: 1; min-height: 0; }
+			body {
+				display: flex;
+				flex-direction: column;
+			}
+			voyager-story {
+				position: relative;
+				display: block;
+				flex: 1;
+				min-height: 0;
+			}
 		</style>
 	</head>
 	<body>
@@ -28,8 +36,25 @@
 			let app;
 			let animations;
 			let started = false;
+			const pendingFiles = new Map();
+			const mediaPreviews = new Map();
+			const previewPaths = new Map();
+			let writeError = '';
 			const send = (type, data = {}) =>
 				parent.postMessage({ type, session, ...data }, location.origin);
+			// Story's toolbar normally writes to WebDAV. Route its scene Save through the same
+			// authenticated scene-and-article save as the surrounding editor instead.
+			document.addEventListener(
+				'click',
+				(event) => {
+					const button = event.target.closest?.('ff-button');
+					if (button?.getAttribute('text') !== 'Save') return;
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					send('save-request');
+				},
+				{ capture: true }
+			);
 			addEventListener('message', async (event) => {
 				if (
 					event.source !== parent ||
@@ -41,7 +66,127 @@
 				try {
 					if (event.data.type === 'init' && !started) {
 						started = true;
-						const { root, resourceRoot, document: scene, model, title, assets } = event.data;
+						const {
+							root,
+							resourceRoot,
+							document: scene,
+							model,
+							title,
+							assets,
+							companionFiles = []
+						} = event.data;
+						const directory = new URL(root || '/', location.href);
+						const folders = new Set(['', 'articles/']);
+						const xml = (value) =>
+							String(value).replace(
+								/[<>&"']/g,
+								(character) =>
+									({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[
+										character
+									]
+							);
+						const listing = (path) => {
+							const paths = new Set([
+								...folders,
+								...Object.keys(assets),
+								...[...pendingFiles.values()].map((entry) => entry.path)
+							]);
+							for (const entry of [...paths]) {
+								const parts = entry.split('/');
+								parts.pop();
+								while (parts.length) {
+									paths.add(parts.join('/') + '/');
+									parts.pop();
+								}
+							}
+							const date = new Date().toUTCString();
+							const responses = [...paths]
+								.filter((entry) => entry === path || entry.startsWith(path))
+								.map((entry) => {
+									const folder = !entry || entry.endsWith('/');
+									const name = entry.split('/').filter(Boolean).pop() || 'Edition files';
+									const type = /\.html?$/i.test(entry)
+										? 'text/html'
+										: /\.png$/i.test(entry)
+											? 'image/png'
+											: /\.jpe?g$/i.test(entry)
+												? 'image/jpeg'
+												: 'application/octet-stream';
+									return `<d:response><d:href>${xml(new URL(entry, directory).pathname)}</d:href><d:propstat><d:prop><d:displayname>${xml(name)}</d:displayname><d:creationdate>${xml(date)}</d:creationdate><d:getlastmodified>${xml(date)}</d:getlastmodified><d:getcontentlength>0</d:getcontentlength><d:getcontenttype>${type}</d:getcontenttype><d:resourcetype>${folder ? '<d:collection/>' : ''}</d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`;
+								});
+							return new Response(
+								`<d:multistatus xmlns:d="DAV:">${responses.join('')}</d:multistatus>`,
+								{ status: 207, headers: { 'Content-Type': 'application/xml' } }
+							);
+						};
+						const publicSuffix = (url) => {
+							const params = new URLSearchParams(url.search);
+							params.delete('token');
+							for (const [key, value] of [...params])
+								if (/^\d+$/.test(key) && !value) params.delete(key);
+							return { params, hash: url.hash };
+						};
+						const persistentHtml = (html, articleUrl) => {
+							const parsed = new DOMParser().parseFromString(html, 'text/html');
+							for (const element of parsed.querySelectorAll('[src], [href], [poster]')) {
+								for (const attribute of ['src', 'href', 'poster']) {
+									const value = element.getAttribute(attribute);
+									if (!value || value.startsWith('#')) continue;
+									const previewPath =
+										previewPaths.get(value) ||
+										(value.startsWith('data:')
+											? previewPaths.get(value.replace(/\?\d+$/, ''))
+											: null);
+									if (previewPath) {
+										element.setAttribute(attribute, previewPath);
+										continue;
+									}
+									const url = new URL(value, articleUrl);
+									if (
+										url.origin === directory.origin &&
+										url.pathname.startsWith(directory.pathname)
+									) {
+										const { params, hash } = publicSuffix(url);
+										element.setAttribute(
+											attribute,
+											decodeURIComponent(url.pathname.slice(directory.pathname.length)) +
+												(params.size ? '?' + params : '') +
+												hash
+										);
+									}
+								}
+							}
+							for (const element of parsed.querySelectorAll('*')) {
+								for (const attribute of [...element.attributes]) {
+									if (attribute.name.startsWith('data-mce-'))
+										element.removeAttribute(attribute.name);
+								}
+							}
+							return parsed.body.innerHTML;
+						};
+						const readableHtml = (html) => {
+							const parsed = new DOMParser().parseFromString(html, 'text/html');
+							for (const element of parsed.querySelectorAll('[src], [href], [poster]')) {
+								for (const attribute of ['src', 'href', 'poster']) {
+									const value = element.getAttribute(attribute);
+									if (!value || value.startsWith('#')) continue;
+									const url = new URL(value, directory);
+									const name = decodeURIComponent(url.pathname.split('/').pop());
+									if (
+										url.origin === directory.origin &&
+										url.pathname.startsWith(directory.pathname) &&
+										assets[name]
+									) {
+										const mapped = new URL(assets[name]);
+										const { params, hash } = publicSuffix(url);
+										for (const [key, value] of params) mapped.searchParams.append(key, value);
+										mapped.hash = hash;
+										element.setAttribute(attribute, mapped.href);
+									}
+								}
+							}
+							return parsed.body.innerHTML;
+						};
 						const resources = new URL(resourceRoot, location.href);
 						if (
 							resources.origin !== location.origin ||
@@ -60,8 +205,124 @@
 								.replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
 								.toLowerCase()
 								.replace(/[^a-z0-9.]+/g, '_');
-							const response = await originalFetch(assets[name] || assets[normalized] || input, init);
-							if (!title || !scene || new URL(url, location.href).href !== new URL(scene, location.href).href)
+							const mapped = assets[name] || assets[normalized];
+							const requestedUrl = new URL(url, location.href);
+							const resolvedUrl = new URL(mapped || url, location.href);
+							const owned =
+								resolvedUrl.origin === directory.origin &&
+								resolvedUrl.pathname.startsWith(directory.pathname);
+							const key = owned
+								? decodeURIComponent(resolvedUrl.pathname.slice(directory.pathname.length))
+								: '';
+							const method = (
+								init?.method || (input instanceof Request ? input.method : 'GET')
+							).toUpperCase();
+							if (method === 'PROPFIND' && owned) return listing(key);
+							if (
+								method === 'MKCOL' &&
+								owned &&
+								/^[-\w/ ]+\/?$/.test(key) &&
+								!key.split('/').includes('..')
+							) {
+								folders.add(key.replace(/\/?$/, '/'));
+								return new Response(null, { status: 201 });
+							}
+							if (method === 'PUT') {
+								try {
+									if (
+										!owned ||
+										requestedUrl.origin !== directory.origin ||
+										!requestedUrl.pathname.startsWith(directory.pathname)
+									)
+										throw new Error(
+											'Voyager can only change this edition’s article and media files.'
+										);
+									const path = decodeURIComponent(
+										requestedUrl.pathname.slice(directory.pathname.length)
+									);
+									if (
+										!/^[-\w./ ]+$/.test(path) ||
+										path.split('/').some((part) => !part || part === '.' || part === '..') ||
+										!/\.(html?|png|jpe?g|webp|gif|avif|mp3|wav|ogg|mp4|webm|vtt)$/i.test(path)
+									)
+										throw new Error('This article or media filename is not supported.');
+									let blob = await new Request(input, init).blob();
+									if (/\.html?$/i.test(path)) {
+										if (blob.size > 100 * 1024 * 1024)
+											throw new Error('Article editor content is too large.');
+										blob = new Blob([persistentHtml(await blob.text(), requestedUrl)], {
+											type: 'text/html'
+										});
+										if (blob.size > 5 * 1024 * 1024)
+											throw new Error('Articles must be 5 MB or smaller.');
+									}
+									const total = [...pendingFiles.entries()].reduce(
+										(sum, [name, entry]) => sum + (name === key ? 0 : entry.file.size),
+										blob.size
+									);
+									if (
+										total > 50 * 1024 * 1024 ||
+										(!pendingFiles.has(key) && pendingFiles.size >= 100)
+									)
+										throw new Error('Save up to 100 changed files and 50 MB of media at a time.');
+									pendingFiles.set(key, {
+										path,
+										original: companionFiles.includes(key) ? key : null,
+										file: new File([blob], path.split('/').pop(), { type: blob.type })
+									});
+									const extension = path.split('.').pop().toLowerCase();
+									const imageType = {
+										png: 'image/png',
+										jpg: 'image/jpeg',
+										jpeg: 'image/jpeg',
+										gif: 'image/gif',
+										webp: 'image/webp',
+										avif: 'image/avif'
+									}[extension];
+									if (imageType) {
+										const preview = await new Promise((resolve, reject) => {
+											const reader = new FileReader();
+											// Story appends a numeric cache buster. Keep it in the fragment,
+											// not in the base64 image payload.
+											reader.onload = () => resolve(reader.result + '#voyager-preview');
+											reader.onerror = () =>
+												reject(new Error('Could not preview the uploaded image.'));
+											reader.readAsDataURL(new Blob([blob], { type: imageType }));
+										});
+										if (mediaPreviews.has(key)) previewPaths.delete(mediaPreviews.get(key));
+										mediaPreviews.set(key, preview);
+										previewPaths.set(preview, path);
+									}
+									send('dirty');
+									return new Response(null, { status: 200 });
+								} catch (error) {
+									writeError = error.message || 'Could not prepare article or media changes.';
+									send('error', { message: writeError });
+									throw error;
+								}
+							}
+							if (!['GET', 'HEAD'].includes(method))
+								throw new Error('Use Save scene & close to save changes to this edition.');
+							if (owned && pendingFiles.has(key)) {
+								const file = pendingFiles.get(key).file;
+								return new Response(
+									method === 'HEAD'
+										? null
+										: /\.html?$/i.test(key)
+											? readableHtml(await file.text())
+											: file
+								);
+							}
+							const response = await originalFetch(mapped || input, init);
+							if (owned && method === 'GET' && /\.html?$/i.test(name) && response.ok)
+								return new Response(readableHtml(await response.text()), {
+									headers: { 'Content-Type': 'text/html' }
+								});
+							if (
+								!title ||
+								!scene ||
+								new URL(url, location.href).href !== new URL(scene, location.href).href
+							)
 								return response;
 							const document = await response.clone().json();
 							const scenes = Array.isArray(document.scenes) ? document.scenes : [];
@@ -111,6 +372,18 @@
 							expert: false
 						});
 						app.setBaseUrl(root || location.origin + '/');
+						const originalAssetUrl = app.assetManager.getAssetUrl.bind(app.assetManager);
+						app.assetManager.getAssetUrl = (path) => {
+							const original = originalAssetUrl(path);
+							const url = new URL(original, directory);
+							if (url.origin !== directory.origin || !url.pathname.startsWith(directory.pathname))
+								return original;
+							const name = decodeURIComponent(url.pathname.split('/').pop());
+							const mapped = assets[name];
+							const resolved = new URL(mapped || original, directory);
+							const key = decodeURIComponent(resolved.pathname.slice(directory.pathname.length));
+							return mediaPreviews.get(key) || mapped || original;
+						};
 						const StoryView = customElements.get('voyager-story');
 						const view = new StoryView(app);
 						view.style.height = '0';
@@ -141,15 +414,34 @@
 						}
 						if (!app.documentProvider?.activeComponent?.deflateDocument)
 							throw new Error('This Voyager version cannot save scenes through the editor.');
+						// The embedded loader does not run Story's normal root-ready callback. Its
+						// media browser reads the scoped in-memory listing provided above instead.
+						app.assetManager.ins.baseUrlValid.setValue(true);
+						await app.mediaManager.refresh();
 						animations.refresh();
 						send('ready');
 						// Mark interactions as potentially unsaved; never discard scene work silently.
 						for (const type of ['input', 'change', 'pointerdown'])
 							document.addEventListener(type, () => send('dirty'), { capture: true });
 					} else if (event.data.type === 'export' && app) {
+						// TinyMCE keeps the active article outside the scene JSON. Flush it through the
+						// staged writer before collecting both the scene and its companion files.
+						writeError = '';
+						for (const editor of document.querySelectorAll('sv-article-editor')) {
+							if (
+								editor._assetPath &&
+								window.tinymce?.activeEditor?.isDirty() &&
+								typeof editor.writeArticle === 'function'
+							)
+								await editor.writeArticle();
+						}
+						if (writeError) throw new Error(writeError);
 						animations?.prepareSave();
 						await new Promise(requestAnimationFrame);
-						send('document', { document: app.documentProvider.activeComponent.deflateDocument() });
+						send('document', {
+							document: app.documentProvider.activeComponent.deflateDocument(),
+							files: [...pendingFiles.values()]
+						});
 					}
 				} catch (error) {
 					send('error', { message: error.message || 'Scene editor failed.' });

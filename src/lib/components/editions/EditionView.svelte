@@ -98,10 +98,7 @@
 		previewOwner = owner;
 		viewerPreference = viewer;
 		try {
-			localStorage.setItem(
-				editionViewerPreferenceKey(cachePrefix, owner),
-				viewer
-			);
+			localStorage.setItem(editionViewerPreferenceKey(cachePrefix, owner), viewer);
 		} catch {
 			// Do not let restricted storage prevent switching layouts.
 		}
@@ -1150,6 +1147,7 @@
 											editionId={edition.id}
 											language={activeViewerLanguage}
 											root={edition.voyagerRoot || ''}
+											assets={edition.uploadedAssetMap}
 											activeArticleId={selectedStoryId}
 											linkedArticleId={linkedTourArticleId}
 											onArticle={selectStory}
@@ -1385,6 +1383,7 @@
 									{:else if useExperimentalLayout && readingTab === 'stories' && sceneContent}
 										<EditionStories
 											articles={sceneContent.articles}
+											assets={edition.uploadedAssetMap}
 											editionId={edition.id}
 											language={activeViewerLanguage}
 											root={edition.voyagerRoot || ''}

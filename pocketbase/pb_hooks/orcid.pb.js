@@ -137,6 +137,18 @@ onRecordCreateRequest(
 	'editionUsers'
 );
 
+routerAdd(
+	'GET',
+	'/api/pure3d/voyager/save-capability',
+	(e) => e.json(200, { protocol: 'scene-and-assets-v1' }),
+	$apis.requireAuth('users')
+);
+
+onRecordUpdateRequest((e) => {
+	if (e.requestInfo().body.voyagerSave === undefined) return e.next();
+	return require(__hooks + '/voyager-save-service.cjs').prepare(e);
+}, 'editions');
+
 onRecordUpdateRequest(
 	(e) => {
 		return require(__hooks + '/orcid-service.cjs').updateRequest(e);

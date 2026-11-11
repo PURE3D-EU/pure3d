@@ -450,7 +450,7 @@
 					? 'description'
 					: 'peer-review';
 			conceptTitle = edition.title;
-			conceptDescription = edition.description;
+			conceptDescription = edRecord.dcAbstract || '';
 			conceptPeerReview = edition.peerReviewRequested;
 			conceptDcSubtitle = edRecord.dcSubtitle || '';
 			credits = readCredits(edRecord.credits);
@@ -707,7 +707,6 @@
 			dcTitle: conceptTitle.trim(),
 			dcSubtitle: conceptDcSubtitle.trim(),
 			dcAbstract: conceptDescription,
-			dcDescription: conceptDescription,
 			credits: readCredits(credits),
 			dcInstitution: stringToJsonArray(conceptDcInstitution),
 			dcSubject: conceptDcSubject,
@@ -1859,9 +1858,12 @@
 																		<SearchableSelect
 																			id="concept-license"
 																			options={optionsFor('license', [conceptDcRightsLicense])}
-																			values={conceptDcRightsLicense ? [conceptDcRightsLicense] : []}
+																			values={conceptDcRightsLicense
+																				? [conceptDcRightsLicense]
+																				: []}
 																			multiple={false}
-																			onchange={(values) => (conceptDcRightsLicense = values[0] ?? '')}
+																			onchange={(values) =>
+																				(conceptDcRightsLicense = values[0] ?? '')}
 																		/>
 																	{:else}
 																		<input
@@ -1985,6 +1987,9 @@
 										<span class="size-2 rounded-full bg-current"></span>
 									{/if}
 									<span>{saveStatusText}</span>
+									{#if saveStatus === 'error'}
+										<span>{saveError || 'Could not save your changes. Try saving again.'}</span>
+									{/if}
 								</div>
 								<button
 									type="button"
@@ -2323,8 +2328,8 @@
 			<h2 id="sandbox-transfer-title" class="text-lg font-semibold">Transfer sandbox work</h2>
 			<p class="mt-2 text-sm text-base-content/70">
 				This copies your editor metadata, model files, and Voyager scene into an empty approved
-				edition. The sandbox is retained so you can confirm the copy before deleting it. The approved
-				edition keeps its title, attribution, and review choice.
+				edition. The sandbox is retained so you can confirm the copy before deleting it. The
+				approved edition keeps its title, attribution, and review choice.
 			</p>
 			<label class="mt-4 block" for="sandbox-transfer-target">
 				<span class="mb-1 block text-sm font-medium">Approved edition</span>

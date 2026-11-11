@@ -646,7 +646,20 @@ function validateRecord(e) {
 		const active =
 			r.getBool(publishField) ||
 			(edition && r.getString('status') !== '' && r.getString('status') !== 'draft');
-		const editingPublic = active && changed(r, 'credits');
+		const editingUnpublished =
+			edition &&
+			!r.getBool(publishField) &&
+			[
+				'draft',
+				'concept_rejected',
+				'concept_accepted',
+				'alpha_rejected',
+				'alpha_revisions',
+				'alpha_accepted',
+				'final_revisions',
+				'final_accepted'
+			].includes(r.getString('status'));
+		const editingPublic = active && !editingUnpublished && changed(r, 'credits');
 		if (active && !r.isNew() && ['dcCreator', 'dcContributor'].some((field) => changed(r, field)))
 			bad('Use canonical credits; legacy published attribution can only be preserved');
 		if (r.isNew() || changed(r, 'credits') || entering) {

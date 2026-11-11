@@ -7,6 +7,21 @@ function basename(path: string): string {
 	return slash === -1 ? path : path.slice(slash + 1);
 }
 
+function mappedUri(uri: string, fileMap: FileMap): string {
+	const path = uri.split(/[?#]/, 1)[0];
+	const mapped = fileMap[basename(path)] ?? fileMap[pbNormalize(basename(path))];
+	if (!mapped) return uri;
+	const suffix = new URL(uri, 'https://pure3d.invalid/');
+	suffix.searchParams.delete('token');
+	for (const [key, value] of [...suffix.searchParams])
+		if (/^\d+$/.test(key) && !value) suffix.searchParams.delete(key);
+	return (
+		mapped.split('#', 1)[0] +
+		(suffix.search ? (mapped.includes('?') ? '&' : '?') + suffix.search.slice(1) : '') +
+		suffix.hash
+	);
+}
+
 function rewriteValue(value: unknown, fileMap: FileMap): unknown {
 	if (Array.isArray(value)) {
 		return value.map((item) => rewriteValue(item, fileMap));
@@ -15,8 +30,14 @@ function rewriteValue(value: unknown, fileMap: FileMap): unknown {
 		const result: Record<string, unknown> = {};
 		for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
 			if (key === 'uri' && typeof v === 'string') {
-				const mapped = fileMap[basename(v)] ?? fileMap[pbNormalize(basename(v))];
-				result[key] = mapped ?? v;
+				result[key] = mappedUri(v, fileMap);
+			} else if (key === 'uris' && v && typeof v === 'object' && !Array.isArray(v)) {
+				result[key] = Object.fromEntries(
+					Object.entries(v).map(([language, uri]) => [
+						language,
+						typeof uri === 'string' ? mappedUri(uri, fileMap) : uri
+					])
+				);
 			} else {
 				result[key] = rewriteValue(v, fileMap);
 			}
