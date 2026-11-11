@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.3.0 - 2026-11-11
+
+### Features
+
+- add opt-in subscriptions and campaign management (542149ba)
+- add full CMS component editing (922f52ca)
+
+### Fixes
+
+- restore unpublished edition editing and Voyager article saves (685c6b50)
+- enforce session expiration across the app (fbabd07c)
+- harden backend access and storage controls (ff63ffc6)
+
+### Maintenance
+
+- style(ui): refine collections page header layout (3c686799)
+
 ## v2.2.0 - 2026-11-03
 
 ### Features
