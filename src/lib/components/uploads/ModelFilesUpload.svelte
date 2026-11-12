@@ -4,6 +4,8 @@
 	import type { RecordModel } from 'pocketbase';
 	import toast from 'svelte-french-toast';
 	import { addNormalsToPlyFile } from '$lib/utils/ply-normals';
+	import { untrack } from 'svelte';
+	import { fetchFileSize } from '$lib/utils/file-size';
 
 	type Props = {
 		record: RecordModel;
@@ -31,6 +33,33 @@
 		Array.isArray(record.modelAssets) ? (record.modelAssets as string[]) : []
 	);
 	let isObj = $derived(modelFilename.toLowerCase().endsWith('.obj'));
+	let fileSizes = $state<Record<string, number | null>>({});
+
+	$effect(() => {
+		const currentRecord = record;
+		const filenames = [modelFilename, ...assetFilenames].filter(Boolean);
+		const controller = new AbortController();
+		fileSizes = {};
+		if (filenames.length === 0) return;
+		void untrack(async () => {
+			try {
+				const token = currentRecord.isPublished ? '' : await pb.files.getToken();
+				if (controller.signal.aborted) return;
+				await Promise.all(
+					filenames.map(async (filename) => {
+						const size = await fetchFileSize(
+							pb.files.getURL(currentRecord, filename, { token }),
+							controller.signal
+						);
+						if (!controller.signal.aborted) fileSizes[filename] = size;
+					})
+				);
+			} catch {
+				// File metadata must not prevent editing the edition.
+			}
+		});
+		return () => controller.abort();
+	});
 
 	let uploading = $state(false);
 	$effect(() => {
@@ -346,6 +375,7 @@
 </script>
 
 <div
+	id="model-files-upload"
 	class="space-y-3 rounded-lg transition-all {dragActive
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100'
 		: ''}"
@@ -380,6 +410,11 @@
 						Main model{assetFilenames.length > 0
 							? ` + ${assetFilenames.length} companion${assetFilenames.length === 1 ? '' : 's'}`
 							: ''}
+						{#if fileSizes[modelFilename] != null}
+							 · {humanSize(fileSizes[modelFilename]!)}
+						{:else}
+							 · Size unavailable
+						{/if}
 					</div>
 				</div>
 				<div class="flex shrink-0 gap-2">
@@ -402,6 +437,9 @@
 					{#each assetFilenames as filename (filename)}
 						<li class="flex items-center justify-between gap-2">
 							<span class="truncate text-xs" title={filename}>{filename}</span>
+							<span class="shrink-0 text-xs text-base-content/50">
+								{fileSizes[filename] != null ? humanSize(fileSizes[filename]!) : 'Size unavailable'}
+							</span>
 							<button
 								type="button"
 								class="btn btn-ghost btn-xs"

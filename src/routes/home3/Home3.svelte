@@ -76,36 +76,31 @@
 		return { destroy: () => observer.disconnect() };
 	}
 
-	let storyIndex = $state(0);
 	const storySteps = [
 		{
 			kicker: 'Conceptualise',
 			title: 'Build the narrative.',
 			description: 'A 3D scholarly edition begins with a model and a story to tell.',
-			image: '/images/landing/akua-object.webp',
-			alt: 'Close-up of the wooden Akua’ba child figure in the published 3D edition',
-			caption: 'Begin with an object and a question.'
+			image: '/images/landing/capture.webp',
+			alt: 'Wireframe study for conceptualising a 3D scholarly edition'
 		},
 		{
 			kicker: 'Implement',
-			title: 'Author using interface.',
+			title: 'Create the edition.',
 			description:
 				'Harnessing the affordances of interface, curate an interactive experience that details model sources, evidence and interpretation.',
-			image: '/images/landing/akua-annotated.webp',
-			alt: 'The real Akua’ba edition with an eyebrow annotation and its supporting interpretation open',
-			caption: 'Connect the model to its interpretation.'
+			image: '/images/landing/annotate.webp',
+			alt: 'Wireframe study for authoring a 3D scholarly edition'
 		},
 		{
 			kicker: 'Publish',
 			title: 'Revise from feedback.',
 			description:
 				'The two stage review process collects input on the technical and conceptual implementation.',
-			image: '/images/landing/akua-published.webp',
-			alt: 'The published Akua’ba child figure edition with its 3D viewer, description and edition record',
-			caption: 'Bring the research together in an edition.'
+			image: '/images/landing/review.webp',
+			alt: 'Wireframe study for revising a 3D scholarly edition after review'
 		}
 	];
-	const selectedStory = $derived(storySteps[storyIndex]);
 	const workflow = ['Proposal', 'Proposal review', 'Alpha review', 'Final review', 'Publication'];
 	const promiseCards = [
 		{
@@ -240,50 +235,18 @@
 				</div>
 				{@render catalogueStats()}
 			</header>
-			<div class="edition-story" use:reveal>
-				<figure class="story-media" id="home3-story-media">
-					<div class="story-image">
-						{#each storySteps as step, i (step.kicker)}
-							<img
-								src={`${base}${step.image}`}
-								alt={step.alt}
-								hidden={storyIndex !== i}
-								loading="lazy"
-								decoding="async"
-							/>
-						{/each}
-					</div>
-					<figcaption aria-live="polite">
-						<span>{selectedStory.caption}</span>
-						<a href={resolve('/editions/[slug]', { slug: '4ze4q66v8wbs87n' })}>
-							Akua’ba child figure <span aria-hidden="true">↗</span>
-						</a>
-					</figcaption>
-				</figure>
-				<ol class="story-steps" aria-label="Explore the three stages of an edition">
-					{#each storySteps as step, i (step.kicker)}
-						<li>
-							<button
-								type="button"
-								aria-pressed={storyIndex === i}
-								aria-controls="home3-story-media"
-								onclick={() => (storyIndex = i)}
-							>
-								<span class="story-step-head">
-									<span class="kicker">0{i + 1} / {step.kicker}</span>
-									<span class="story-arrow" aria-hidden="true">↗</span>
-								</span>
-								<span class="story-title">{step.title}</span>
-								<span class="story-description">{step.description}</span>
-							</button>
-						</li>
-					{/each}
-				</ol>
-				<div class="story-mobile-copy">
-					<h3>{selectedStory.title}</h3>
-					<p>{selectedStory.description}</p>
-				</div>
-			</div>
+			<ol class="plates">
+				{#each storySteps as step, i (step.kicker)}
+					<li class="plate" use:reveal={i * 140}>
+						<img src={`${base}${step.image}`} alt={step.alt} loading="lazy" decoding="async" />
+						<div>
+							<span class="kicker">{step.kicker}</span>
+							<h3>{step.title}</h3>
+							<p>{step.description}</p>
+						</div>
+					</li>
+				{/each}
+			</ol>
 		</div>
 	</section>
 
@@ -720,97 +683,46 @@
 		color: var(--color-vermillion-ink);
 	}
 
-	/* ---------- real-edition walkthrough ---------- */
-	.edition-story {
+	/* ---------- evidence plates ---------- */
+	.plates {
 		display: grid;
-		grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-		align-items: start;
-		gap: 40px;
-	}
-	.story-media {
-		margin: 0;
-	}
-	.story-image {
-		aspect-ratio: 4 / 3;
-		overflow: hidden;
-		border-radius: var(--radius-surface);
-		background: var(--color-paper-2);
-	}
-	.story-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.story-image img[hidden] {
-		display: none;
-	}
-	.story-media figcaption {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		gap: 8px 24px;
-		padding-top: 16px;
-		font-size: 12px;
-		line-height: 1.5;
-		color: var(--color-ink-3);
-	}
-	.story-media figcaption a {
-		color: var(--color-ink-2);
-		text-underline-offset: 4px;
-	}
-	.story-steps {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 16px;
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
-	.story-steps li + li {
-		border-top: 1px solid var(--rule);
-	}
-	.story-steps button {
+	.plate {
 		display: grid;
-		gap: 12px;
+		grid-template-rows: auto 1fr;
+		overflow: hidden;
+		border: 1px solid var(--rule);
+		border-radius: var(--radius-surface);
+		background: var(--color-paper);
+	}
+	.plate img {
 		width: 100%;
-		padding: 24px;
-		border: 0;
-		border-radius: 0;
-		background: transparent;
-		color: inherit;
-		text-align: left;
-		cursor: pointer;
-	}
-	.story-steps button:hover,
-	.story-steps button[aria-pressed='true'] {
+		aspect-ratio: 4 / 3;
+		object-fit: contain;
 		background: var(--color-paper-2);
+		border-bottom: 1px solid var(--rule);
 	}
-	.story-step-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
+	.plate > div {
+		display: grid;
+		align-content: start;
+		gap: 12px;
+		padding: clamp(20px, 2.4vw, 32px);
 	}
-	.story-arrow {
-		color: var(--color-ink-3);
-		opacity: 0;
-	}
-	.story-steps button[aria-pressed='true'] .story-arrow,
-	.story-steps button:hover .story-arrow,
-	.story-steps button:focus-visible .story-arrow {
-		opacity: 1;
-	}
-	.story-title {
-		font-size: 24px;
-		font-weight: 500;
+	.plate h3 {
+		font-size: clamp(22px, 2.2vw, 30px);
 		line-height: 1.08;
-		letter-spacing: -0.02em;
 	}
-	.story-description {
+	.plate p {
+		margin: 0;
 		font-family: var(--font-serif);
-		font-size: 16px;
+		font-size: 17px;
 		line-height: 1.5;
 		color: var(--color-ink-3);
-	}
-	.story-mobile-copy {
-		display: none;
 	}
 
 	/* ---------- workflow track ---------- */
@@ -1127,47 +1039,18 @@
 		.call-plate {
 			grid-template-columns: 1fr;
 		}
-		.edition-story,
+		.plates,
 		.promise-grid {
 			grid-template-columns: 1fr;
 		}
-		.edition-story {
-			gap: 24px;
+		.plate {
+			grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+			grid-template-rows: none;
 		}
-		.story-steps {
-			order: -1;
-			display: grid;
-			grid-template-columns: repeat(3, minmax(0, 1fr));
-			border-bottom: 1px solid var(--rule);
-		}
-		.story-steps li + li {
-			border-top: 0;
-		}
-		.story-steps button {
+		.plate img {
 			height: 100%;
-			padding: 16px;
-			align-content: start;
-		}
-		.story-steps .story-title {
-			font-size: 20px;
-		}
-		.story-description,
-		.story-arrow {
-			display: none;
-		}
-		.story-mobile-copy {
-			display: grid;
-			gap: 12px;
-		}
-		.story-mobile-copy h3 {
-			font-size: 24px;
-		}
-		.story-mobile-copy p {
-			margin: 0;
-			font-family: var(--font-serif);
-			font-size: 17px;
-			line-height: 1.5;
-			color: var(--color-ink-3);
+			border-right: 1px solid var(--rule);
+			border-bottom: 0;
 		}
 		.promise {
 			min-height: 0;
@@ -1187,14 +1070,12 @@
 		.news-grid {
 			grid-template-columns: 1fr;
 		}
-		.story-steps .story-title {
-			display: none;
+		.plate {
+			grid-template-columns: 1fr;
 		}
-		.story-steps button {
-			padding: 16px 8px;
-		}
-		.story-steps .kicker {
-			font-size: 10px;
+		.plate img {
+			border-right: 0;
+			border-bottom: 1px solid var(--rule);
 		}
 		.track {
 			grid-template-columns: 1fr;

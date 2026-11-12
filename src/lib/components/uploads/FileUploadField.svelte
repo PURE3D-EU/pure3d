@@ -3,6 +3,7 @@
 	import type { RecordModel } from 'pocketbase';
 	import { untrack, type Snippet } from 'svelte';
 	import toast from 'svelte-french-toast';
+	import { fetchFileSize } from '$lib/utils/file-size';
 
 	type Props = {
 		record: RecordModel;
@@ -242,6 +243,18 @@
 	let fileUrl = $derived(
 		currentFilename ? pb.files.getURL(record, currentFilename, { token: fileToken }) : ''
 	);
+	let fileSize = $state<number | null>(null);
+	$effect(() => {
+		const url = fileUrl;
+		const controller = new AbortController();
+		fileSize = null;
+		if (url && (collectionName !== 'editions' || record.isPublished || fileToken)) {
+			void fetchFileSize(url, controller.signal).then((size) => {
+				if (!controller.signal.aborted) fileSize = size;
+			});
+		}
+		return () => controller.abort();
+	});
 </script>
 
 <div id="file-upload-field" class="space-y-2">
@@ -270,6 +283,9 @@
 			{:else}
 				<div class="text-xs">{currentFilename}</div>
 			{/if}
+			<div class="text-xs text-base-content/50">
+				{fileSize !== null ? humanSize(fileSize) : 'Size unavailable'}
+			</div>
 			<div class="mt-2 flex gap-2">
 				<button type="button" class="btn btn-outline btn-xs" onclick={pick} {disabled}>
 					Replace
