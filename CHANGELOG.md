@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.5.0 - 2026-11-12
+
+### Features
+
+- enhance landing page edition stage illustrations (276b26e4)
+
 ## v2.4.0 - 2026-11-12
 
 ### Features
