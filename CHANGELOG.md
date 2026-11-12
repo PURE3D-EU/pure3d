@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.4.0 - 2026-11-12
+
+### Features
+
+- display file sizes and restore landing page cards (a80beeb1)
+
 ## v2.3.0 - 2026-11-11
 
 ### Features
