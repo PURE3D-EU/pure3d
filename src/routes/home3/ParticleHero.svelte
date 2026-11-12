@@ -526,7 +526,7 @@
 					<p class="source-credit">
 						{#if form.sourceSlug}
 							<a href={resolve('/editions/[slug]', { slug: form.sourceSlug })}>
-								Source Edition – {form.sourceTitle ?? form.title}
+								{form.sourceTitle ?? form.title}
 								<span aria-hidden="true">↗</span>
 							</a>
 						{/if}

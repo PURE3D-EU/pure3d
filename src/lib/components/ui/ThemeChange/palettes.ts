@@ -654,6 +654,8 @@ export function applyPalette(colors: Palette, darkHero = true) {
 	};
 	const root = document.documentElement;
 	root.dataset.theme = 'pure3d';
-	root.style.colorScheme = readableText(background) === '#ffffff' ? 'dark' : 'light';
+	const colorScheme = readableText(background) === '#ffffff' ? 'dark' : 'light';
+	root.style.colorScheme = colorScheme;
+	root.dataset.colorScheme = colorScheme;
 	for (const [key, value] of Object.entries(tokens)) root.style.setProperty(`--${key}`, value);
 }

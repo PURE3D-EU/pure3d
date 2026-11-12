@@ -6,6 +6,7 @@
 	import NewsletterSignup from '$lib/components/ui/NewsletterSignup.svelte';
 	import { pb } from '$lib/database/client';
 	import { homeStore, fetchHomeData, isStale } from '$lib/stores/data.store';
+	import EditionStageArtwork from './EditionStageArtwork.svelte';
 	import ParticleHero from './ParticleHero.svelte';
 	import type { GlyphSource } from './particle-field';
 
@@ -79,28 +80,29 @@
 	const storySteps = [
 		{
 			kicker: 'Conceptualise',
-			title: 'Build the narrative.',
-			description: 'A 3D scholarly edition begins with a model and a story to tell.',
-			image: '/images/landing/capture.webp',
-			alt: 'Wireframe study for conceptualising a 3D scholarly edition'
+			title: 'Build the Narrative.',
+			description:
+				'Start with a 3D model and a story to tell. Shape the narrative around your sources, evidence and interpretation, making the model central to your argument.',
+			stage: 'concept',
+			alt: 'Wireframe house with callouts for the research question, sources and evidence, and narrative structure'
 		},
 		{
 			kicker: 'Implement',
-			title: 'Create the edition.',
+			stage: 'implementation',
+			title: 'Create the Edition.',
 			description:
-				'Harnessing the affordances of interface, curate an interactive experience that details model sources, evidence and interpretation.',
-			image: '/images/landing/annotate.webp',
-			alt: 'Wireframe study for authoring a 3D scholarly edition'
+				'Bring your narrative into the 3D environment. Combine annotations, articles, multimedia, and interaction to connect features of the model with your evidence and interpretation.',
+			alt: 'House with a rendered façade and wireframe side, showing contextual annotations, connected evidence and a path for guided exploration'
 		},
 		{
 			kicker: 'Publish',
-			title: 'Revise from feedback.',
+			title: 'Refine and Publish.',
 			description:
-				'The two stage review process collects input on the technical and conceptual implementation.',
-			image: '/images/landing/review.webp',
-			alt: 'Wireframe study for revising a 3D scholarly edition after review'
+				'Develop your edition through technical and scholarly review. Respond to feedback, refine the content and interactive experience, and publish your work as a 3D Scholarly Edition.',
+			stage: 'publication',
+			alt: 'Fully rendered house with callouts for scholarly review, technical review and the published edition'
 		}
-	];
+	] as const;
 	const workflow = ['Proposal', 'Proposal review', 'Alpha review', 'Final review', 'Publication'];
 	const promiseCards = [
 		{
@@ -237,8 +239,8 @@
 			</header>
 			<ol class="plates">
 				{#each storySteps as step, i (step.kicker)}
-					<li class="plate" use:reveal={i * 140}>
-						<img src={`${base}${step.image}`} alt={step.alt} loading="lazy" decoding="async" />
+					<li class="plate" use:reveal={i * 80}>
+						<EditionStageArtwork stage={step.stage} alt={step.alt} />
 						<div>
 							<span class="kicker">{step.kicker}</span>
 							<h3>{step.title}</h3>
@@ -700,9 +702,9 @@
 		border-radius: var(--radius-surface);
 		background: var(--color-paper);
 	}
-	.plate img {
+	.plate :global(.edition-stage-artwork) {
 		width: 100%;
-		aspect-ratio: 4 / 3;
+		height: auto;
 		object-fit: contain;
 		background: var(--color-paper-2);
 		border-bottom: 1px solid var(--rule);
@@ -996,6 +998,14 @@
 				translate 0.8s var(--ease-out) var(--reveal-delay, 0ms);
 		}
 	}
+	@media (min-width: 961px) {
+		.plate:nth-child(2) {
+			--artwork-delay: 640ms;
+		}
+		.plate:nth-child(3) {
+			--artwork-delay: 1280ms;
+		}
+	}
 	@keyframes rise {
 		from {
 			opacity: 0;
@@ -1047,7 +1057,7 @@
 			grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
 			grid-template-rows: none;
 		}
-		.plate img {
+		.plate :global(.edition-stage-artwork) {
 			height: 100%;
 			border-right: 1px solid var(--rule);
 			border-bottom: 0;
@@ -1073,7 +1083,7 @@
 		.plate {
 			grid-template-columns: 1fr;
 		}
-		.plate img {
+		.plate :global(.edition-stage-artwork) {
 			border-right: 0;
 			border-bottom: 1px solid var(--rule);
 		}
