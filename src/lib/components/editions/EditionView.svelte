@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import { creditHref, creatorNames, readCredits } from '$lib/utils/credits';
 	import ContentRenderer from '$lib/components/content/ContentRenderer.svelte';
 	import SafeLink from '$lib/components/ui/SafeLink.svelte';
@@ -610,7 +611,7 @@
 
 <svelte:head>
 	<title>{edition.title} | Pure 3D</title>
-	<meta name="description" content={edition.description} />
+	<meta name="description" content={contentText(edition.description)} />
 
 	<!-- Preconnect to Voyager API for faster loading -->
 	<link rel="preconnect" href="https://3d-api.si.edu" crossorigin="anonymous" />
@@ -1326,37 +1327,22 @@
 										</div>
 									{/if}
 									{#if readingTab === 'overview'}
-										{#if useExperimentalLayout}
-											<div class="leading-relaxed text-base-content/80">
-												{#each descriptionSegments as segment, index (index)}
-													{#if segment.type === 'text'}
-														<ContentRenderer className="contents" content={segment.content} />
-													{:else if segment.type === 'view-link'}
-														<button
-															type="button"
-															class="link cursor-pointer font-semibold link-primary hover:link-secondary"
-															onclick={() => handleViewClick(segment.viewName || '')}
-															title="Click to change view"
-														>
-															{segment.content}
-														</button>
-													{/if}
-												{/each}
-											</div>
-										{:else}
-											<p class="leading-relaxed text-base-content/80">
-												{#each descriptionSegments as segment, index (index)}
-													{#if segment.type === 'text'}{segment.content}{:else}
-														<button
-															type="button"
-															class="link cursor-pointer font-semibold link-primary hover:link-secondary"
-															onclick={() => handleViewClick(segment.viewName || '')}
-															title="Click to change view">{segment.content}</button
-														>
-													{/if}
-												{/each}
-											</p>
-										{/if}
+										<div class="leading-relaxed text-base-content/80">
+											{#each descriptionSegments as segment, index (index)}
+												{#if segment.type === 'text'}
+													<ContentRenderer className="contents" content={segment.content} />
+												{:else if segment.type === 'view-link'}
+													<button
+														type="button"
+														class="link cursor-pointer font-semibold link-primary hover:link-secondary"
+														onclick={() => handleViewClick(segment.viewName || '')}
+														title="Click to change view"
+													>
+														{segment.content}
+													</button>
+												{/if}
+											{/each}
+										</div>
 
 										<!-- Tags -->
 										<div class="mt-6">

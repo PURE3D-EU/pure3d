@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import { onMount } from 'svelte';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -407,10 +408,9 @@
 										{#if suggestion.authors}
 											<div class="truncate text-sm opacity-60">{suggestion.authors}</div>
 										{:else if suggestion.description}
+											{@const description = contentText(suggestion.description)}
 											<div class="truncate text-sm opacity-60">
-												{suggestion.description.slice(0, 60)}{suggestion.description.length > 60
-													? '...'
-													: ''}
+												{description.slice(0, 60)}{description.length > 60 ? '...' : ''}
 											</div>
 										{/if}
 									</div>

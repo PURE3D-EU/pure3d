@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import ContentRenderer from '$lib/components/content/ContentRenderer.svelte';
 	import { base, resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -219,7 +220,7 @@
 
 <svelte:head>
 	<title>{collection.title} | Pure 3D</title>
-	<meta name="description" content={collection.description} />
+	<meta name="description" content={contentText(collection.description)} />
 </svelte:head>
 
 <div class="container mx-auto max-w-7xl px-4 py-12">

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import { resolve } from '$app/paths';
 	import { getCardImageSources } from '$lib/utils/asset-image-sources';
 
@@ -49,12 +50,7 @@
 		imageLoaded = true;
 	}
 
-	// Strip HTML tags for plain-text preview
-	function stripHtml(html: string): string {
-		return html.replace(/<[^>]*>/g, '').trim();
-	}
-
-	let plainDescription = $derived(stripHtml(collection.description || ''));
+	let plainDescription = $derived(contentText(collection.description || ''));
 	let hasEditionCount = $derived(
 		collection.editionCount !== undefined || collection.editionIds !== undefined
 	);

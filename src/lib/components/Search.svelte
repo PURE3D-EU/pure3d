@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import { creatorNames } from '$lib/utils/credits';
 	import { base, resolve } from '$app/paths';
 	import { contentPath } from '$lib/cms';
@@ -49,7 +50,8 @@
 				type: 'edition',
 				id: edition.id,
 				title: edition.dcTitle || edition.title || 'Untitled',
-				subtitle: creatorNames(edition.credits) || edition.dcAbstract?.slice(0, 80),
+				subtitle:
+					creatorNames(edition.credits) || contentText(edition.dcAbstract || '').slice(0, 80),
 				thumbnail:
 					edition.thumbnail && collectionPubNum > 0
 						? getEditionThumbnailUrl(collectionPubNum, editionPubNum)
@@ -137,7 +139,7 @@
 					type: 'collection' as const,
 					id: collection.id,
 					title: collection.dcTitle || collection.title || 'Untitled',
-					subtitle: collection.dcAbstract?.slice(0, 80),
+					subtitle: contentText(collection.dcAbstract || '').slice(0, 80),
 					thumbnail,
 					url: `${base}/collections/${collection.id}`
 				};

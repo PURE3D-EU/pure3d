@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import SafeLink from '$lib/components/ui/SafeLink.svelte';
 	import { ClientResponseError } from 'pocketbase';
 	import { onMount } from 'svelte';
@@ -280,14 +281,6 @@
 		return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
 	}
 
-	function plainText(html: string) {
-		return html
-			.replace(/&nbsp;/g, ' ')
-			.replace(/<[^>]*>/g, ' ')
-			.replace(/\s+/g, ' ')
-			.trim();
-	}
-
 	function imageUrl(item: FeedbackEntry, filename: string) {
 		return pb.files.getURL(item.record, filename, { thumb: '400x300' });
 	}
@@ -541,7 +534,7 @@
 							<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
 								<div class="space-y-4">
 									<div class="rounded-box bg-base-200 p-4 text-sm whitespace-pre-wrap">
-										{plainText(item.feedbackHtml) || 'No written feedback.'}
+										{contentText(item.feedbackHtml) || 'No written feedback.'}
 									</div>
 
 									{#if item.images.length > 0}

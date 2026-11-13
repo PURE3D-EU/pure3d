@@ -215,6 +215,15 @@ purifier?.addHook('afterSanitizeAttributes', (node) => {
 	}
 });
 
+export function contentText(html: string): string {
+	if (typeof window === 'undefined') return '';
+	const document = new DOMParser().parseFromString(cleanContent(html), 'text/html');
+	for (const element of document.body.querySelectorAll('p, div, li, h2, h3, h4, br')) {
+		element.append(document.createTextNode(' '));
+	}
+	return (document.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 export function cleanContent(html: string): string {
 	// The application is an SPA; never emit unsanitised HTML during server evaluation.
 	if (!purifier) return '';

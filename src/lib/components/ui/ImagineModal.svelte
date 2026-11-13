@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contentText } from '$lib/utils/content-html';
 	import { onMount, untrack } from 'svelte';
 	import { pb, cachePrefix } from '$lib/database/client';
 	import { readCredits } from '$lib/utils/credits';
@@ -817,7 +818,9 @@
 				{/if}
 			</div>
 			{#if edition.description}
-				<p class="mt-2 line-clamp-2 text-xs text-base-content/60">{edition.description}</p>
+				<p class="mt-2 line-clamp-2 text-xs text-base-content/60">
+					{contentText(edition.description)}
+				</p>
 			{/if}
 		</div>
 

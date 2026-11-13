@@ -12,3 +12,10 @@
 - 2026-11-12 · OpenCode · Illustration rollback request: inspected current checkout and found the Vlooienburg mockup already removed, with original capture/annotate/review images and alt text restored; no application edits needed. Awaiting partner design.
 
 - 2026-11-12 — OpenCode — Hero: removed the “Source Edition –” prefix; retained the edition title credit and link. No tests run (not requested).
+
+- 2026-11-12 · OpenCode · Edition descriptions: removed the default-viewer plain-text branch and reused the existing sanitised ContentRenderer for all viewer layouts, retaining view-preset buttons. Prettier parsed/formatted the changed Svelte file; browser verification and tests not run (not requested); not deployed.
+
+- 2026-11-13 · OpenCode · Rich-text display follow-up: traced editor-backed fields and public renderers; fixed HTML-bearing edition/collection search snippets, catalogue suggestions, Imagine preview and meta descriptions using shared sanitised text extraction. Collection-card and admin-feedback previews now also decode entities and preserve paragraph spacing.
+- 2026-11-13 · OpenCode · Verification: Prettier processed affected files and the Svelte compiler parsed all eight changed components successfully; existing CMS bodies, collection descriptions, peer reviews, viewer help and story sanitisation inspected. No browser-wide verification, tests or deployment performed.
+
+- 2026-11-13 · OpenCode · Security follow-up: created and read back Task #115 to track rollout reconciliation, private credential/history decisions, residual advisories and deferred non-test delivery checks; linked it to this session. No application edits, tests or production operations performed.
