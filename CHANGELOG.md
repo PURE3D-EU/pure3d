@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.5.1 - 2026-11-13
+
+### Fixes
+
+- render rich-text descriptions as plain-text previews (7d014ecf)
+
 ## v2.5.0 - 2026-11-12
 
 ### Features
