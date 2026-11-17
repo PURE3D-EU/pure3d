@@ -68,6 +68,8 @@
 	let collectionFilter = $state('');
 	let expandedId = $state<string | null>(null);
 	let actionLoading = $state(false);
+	let deleteConfirmId = $state<string | null>(null);
+	let deletingId = $state<string | null>(null);
 	let filteredBaseEditions = $derived(
 		editions.filter((e) => {
 			const query = searchQuery.toLowerCase();
@@ -116,6 +118,18 @@
 	let visibleEditions = $derived(
 		activeTab === 'all' ? filteredBaseEditions : selectedStage?.editions ?? []
 	);
+	let draftProposalGroups = $derived.by(() => {
+		const groups = new Map<string, WfEdition[]>();
+		for (const edition of visibleEditions) {
+			const authorNames = edition.authorNames || 'Authors unavailable';
+			const group = groups.get(authorNames);
+			if (group) group.push(edition);
+			else groups.set(authorNames, [edition]);
+		}
+		return Array.from(groups, ([authorNames, editions]) => ({ authorNames, editions })).sort(
+			(a, b) => a.authorNames.localeCompare(b.authorNames, 'en-GB')
+		);
+	});
 
 	const overrideTargets: Partial<Record<EditionStatus, EditionStatus[]>> = {
 		[EditionStatus.Draft]: [EditionStatus.ConceptSubmitted],
@@ -502,6 +516,28 @@
 		}
 	}
 
+	async function deleteDraftProposal(edition: WfEdition) {
+		if (deletingId || deleteConfirmId !== edition.id || edition.status !== EditionStatus.Draft)
+			return;
+		deletingId = edition.id;
+		try {
+			const current = await pb.collection('editions').getOne(edition.id, { fields: 'id,status' });
+			if (current.status !== EditionStatus.Draft) {
+				throw new Error('This proposal is no longer a draft. Refresh before continuing.');
+			}
+			await pb.collection('editions').delete(edition.id);
+			editions = editions.filter((item) => item.id !== edition.id);
+			expandedId = null;
+			deleteConfirmId = null;
+			toast.success('Draft proposal deleted');
+		} catch (error) {
+			console.error('Error deleting draft proposal:', error);
+			toast.error(error instanceof Error ? error.message : 'Could not delete draft proposal');
+		} finally {
+			deletingId = null;
+		}
+	}
+
 	function getVerdictLabel(verdict: string): string {
 		const labels: Record<string, string> = {
 			accept: 'Accept',
@@ -634,6 +670,24 @@
 				? 'No editions match the selected filters.'
 				: `No editions in ${selectedStage?.label ?? 'this step'} match the selected filters.`}
 		</p>
+	{:else if activeTab === EditionStatus.Draft}
+		<div class="space-y-3">
+			{#each draftProposalGroups as group (group.authorNames)}
+				<details class="rounded-box border border-base-300 bg-base-200">
+					<summary
+						class="cursor-pointer rounded-box p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+					>
+						<span class="ml-2 font-semibold">{group.authorNames}</span>
+						<span class="ml-2 badge badge-neutral badge-sm">{group.editions.length}</span>
+					</summary>
+					<div class="space-y-2 px-3 pb-3">
+						{#each group.editions as edition (edition.id)}
+							{@render editionCard(edition, ReviewStage.Concept, false)}
+						{/each}
+					</div>
+				</details>
+			{/each}
+		</div>
 	{:else}
 		<div class="space-y-2">
 			{#each visibleEditions as edition (edition.id)}
@@ -889,6 +943,20 @@
 	<aside class="space-y-4 rounded-box border border-base-300 bg-base-200/30 p-4">
 		<h3 class="font-semibold">Edition summary</h3>
 		<dl class="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-2 text-sm">
+			{#if edition.record.created}
+				<dt class="font-semibold">Created</dt>
+				<dd>
+					<time datetime={edition.record.created.replace(' ', 'T')}>
+						{new Date(edition.record.created).toLocaleString('en-GB', {
+							day: 'numeric',
+							month: 'short',
+							year: 'numeric',
+							hour: '2-digit',
+							minute: '2-digit'
+						})}
+					</time>
+				</dd>
+			{/if}
 			<dt class="font-semibold">Authors</dt>
 			<dd>{edition.authorNames || 'Not provided'}</dd>
 			{#if edition.collectionTitle}
@@ -899,6 +967,36 @@
 			<dd class="line-clamp-3 break-words">{edition.record.proposalPurpose || 'Not provided'}</dd>
 		</dl>
 		<a class="link text-sm font-medium" href={workflowStepHref(edition.id, edition.status)}>{linkLabel}</a>
+		{#if edition.status === EditionStatus.Draft}
+			{#if deleteConfirmId === edition.id}
+				<div class="space-y-3" aria-live="polite">
+					<p class="text-sm">
+						Permanently delete “{edition.title}”? This cannot be undone.
+					</p>
+					<div class="flex flex-wrap gap-2">
+						<button
+							type="button"
+							class="btn btn-outline btn-sm"
+							disabled={deletingId !== null}
+							onclick={() => (deleteConfirmId = null)}
+						>Cancel</button>
+						<button
+							type="button"
+							class="btn btn-error btn-sm"
+							disabled={deletingId !== null}
+							onclick={() => deleteDraftProposal(edition)}
+						>{deletingId === edition.id ? 'Deleting…' : 'Confirm deletion'}</button>
+					</div>
+				</div>
+			{:else}
+				<button
+					type="button"
+					class="btn btn-outline btn-error btn-sm"
+					disabled={deletingId !== null}
+					onclick={() => (deleteConfirmId = edition.id)}
+				>Delete draft proposal</button>
+			{/if}
+		{/if}
 	</aside>
 {/snippet}
 

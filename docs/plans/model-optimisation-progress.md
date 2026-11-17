@@ -35,6 +35,26 @@ Branch: `main`. Issue: https://github.com/PURE3D-EU/pure3d/issues/117
   whitespace checks passed. These are compilation/syntax observations, not runtime verification.
 - Application tests, typechecks, lint sweeps and production builds were not run. No browser save,
   optimisation or restore journey was exercised; runtime behaviour remains unverified.
-- No commit, push, schema migration or deployment performed. Install the three documented backend
-  files together only after separate deployment approval; incompatible backends retain local
-  analysis/preview/download but cannot apply or restore.
+- Initial implementation performed no commit, push, schema migration or deployment. Incompatible
+  backends retain local analysis/preview/download but cannot apply or restore.
+
+## Authorised production hook deployment — 17 November 2026
+
+- User committed/pushed implementation (`666e29a`) and separately authorised the backend update.
+- Re-discovered PocketBase 0.40.3 in `pure3d-archive-pocketbase-1` on the approved production host.
+  Confirmed existing `modelFile`, `modelAssets` and `sceneDocument` fields; no schema migration needed.
+- Compared installed hooks; preserved unrelated differences. Backed up the complete installed hook
+  directory and verified it under root-owned mode-700
+  `/var/backups/pure3d-model-optimisation-20261117T152329Z`.
+- Installed only the two new optimisation hook files and changed Voyager save service, with staged
+  and installed SHA-256 verification and atomic per-file replacement. Restarted only PocketBase;
+  bounded readiness retries recovered from the initial empty HTTP response without rollback.
+- Verified local/public health, fresh production admin authentication, authenticated
+  `viewing-copy-v1` capability with advertised limits, anonymous capability rejection (401),
+  read-only edition access, unchanged database file fields, file ownership/modes and unchanged
+  unrelated hook checksums. Cleaned up only task-owned staging files; retained rollback backup.
+- Existing Voyager capability rejects superuser credentials (403) because its unchanged route
+  requires the `users` auth collection; this initial probe mismatch was explained by the installed
+  registration. No user impersonation or permission changes were used.
+- No production model/content saves, optimisation/restore journeys or application tests performed.
+  Deployment verification does not establish end-to-end save or visual correctness.

@@ -5,7 +5,7 @@ export const workflowStages: {
 	statuses: EditionStatus[];
 	hrefStatus: EditionStatus;
 }[] = [
-	{ label: 'Proposal', statuses: [EditionStatus.Draft], hrefStatus: EditionStatus.Draft },
+	{ label: 'Draft Proposal', statuses: [EditionStatus.Draft], hrefStatus: EditionStatus.Draft },
 	{
 		label: 'Proposal Review',
 		statuses: [
@@ -16,7 +16,7 @@ export const workflowStages: {
 		hrefStatus: EditionStatus.ConceptSubmitted
 	},
 	{
-		label: 'Draft',
+		label: 'Edition Draft',
 		statuses: [EditionStatus.ConceptAccepted],
 		hrefStatus: EditionStatus.ConceptAccepted
 	},
