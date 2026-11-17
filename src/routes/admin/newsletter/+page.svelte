@@ -29,6 +29,8 @@
 	let busy = $state(false);
 	let loading = $state(true);
 	let sending = $state(false);
+	let sendingTest = $state(false);
+	let testRequest: AbortController | undefined;
 	let stop = $state(false);
 	let error = $state('');
 	let notice = $state('');
@@ -52,6 +54,7 @@
 	});
 	onDestroy(() => {
 		stop = true;
+		testRequest?.abort();
 	});
 	function message(e: unknown) {
 		const response = e as { response?: { message?: string } };
@@ -152,6 +155,28 @@
 		body = selected!.body;
 		notice = 'Draft saved.';
 		await loadCampaigns();
+	}
+	async function sendTest() {
+		if (!selected || dirty) return;
+		const request = new AbortController();
+		testRequest = request;
+		sendingTest = true;
+		const timeout = setTimeout(() => request.abort(), 20000);
+		try {
+			await pb.send(`/api/pure3d/newsletter/campaigns/${selected.id}/test`, {
+				method: 'POST',
+				signal: request.signal
+			});
+			notice = 'Test email accepted by the mail server for your admin account address.';
+		} catch (cause) {
+			if (!request.signal.aborted) throw cause;
+			error =
+				'The mail server did not respond within 20 seconds. Delivery is unconfirmed and the request may still be processing. Check your inbox and SMTP connectivity before sending another test.';
+		} finally {
+			clearTimeout(timeout);
+			testRequest = undefined;
+			sendingTest = false;
+		}
 	}
 	async function send() {
 		if (!selected || dirty) return;
@@ -329,20 +354,12 @@
 							email. Up to 1,000 subscribed addresses per newsletter.
 						</p>
 						{#if !locked}<button class="btn btn-primary" disabled={busy || !dirty}
-								>{busy ? 'Please wait…' : 'Save draft'}</button
+								>{busy && !sendingTest ? 'Please wait…' : 'Save draft'}</button
 							>{/if}
 					</form>
 					{#if selected}<div class="mt-5 flex flex-wrap gap-3">
-							<button
-								class="btn btn-outline"
-								disabled={busy || dirty}
-								onclick={() =>
-									run(async () => {
-										await pb.send(`/api/pure3d/newsletter/campaigns/${selected!.id}/test`, {
-											method: 'POST'
-										});
-										notice = 'Test email sent to your admin account address.';
-									})}>Send me a test</button
+							<button class="btn btn-outline" disabled={busy || dirty} onclick={() => run(sendTest)}
+								>{sendingTest ? 'Sending test…' : 'Send me a test'}</button
 							>
 							{#if selected.status !== 'sent'}<button
 									class="btn btn-primary"

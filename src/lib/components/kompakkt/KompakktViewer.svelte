@@ -10,7 +10,12 @@
 		type KompakktModel
 	} from './kompakkt-resource';
 
-	let { edition }: { edition: EditionViewData['edition'] } = $props();
+	let { edition }: {
+		edition: Pick<
+			EditionViewData['edition'],
+			'title' | 'isPublished' | 'voyagerRoot' | 'sceneFile' | 'uploadedAssetMap'
+		>;
+	} = $props();
 	let attempt = $state(0);
 	let sceneLoading = $state(false);
 	let checking = $state(false);

@@ -152,6 +152,8 @@ make release      # optional explicitly authorised local release fallback
 ## Key Directories
 
 - `src/routes/` - pages, layouts, and endpoints
+- `src/routes/3d-lab/` - experimental Voyager/Kompakkt mesh comparison and externally hosted
+  PlayCanvas SuperSplat sample; separate from published edition viewer choices.
 - `src/lib/` - shared components, database access, types, and utilities
 - `pocketbase/` and `scripts/` - local backend hooks, setup, migrations, and imports
 - `static/voyager/` - Smithsonian Voyager runtime assets
