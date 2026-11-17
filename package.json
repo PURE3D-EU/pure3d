@@ -74,6 +74,7 @@
 		"bson": "^6.10.4",
 		"daisyui": "^5.3.7",
 		"dompurify": "^3.4.17",
+		"playcanvas": "2.24.1",
 		"pocketbase": "^0.26.3",
 		"sanitize-html": "^2.18.1",
 		"svelte-french-toast": "^1.2.0",

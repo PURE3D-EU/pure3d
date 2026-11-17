@@ -6,6 +6,7 @@
 	import SceneDocumentUpload from './SceneDocumentUpload.svelte';
 	import VoyagerPreview from './VoyagerPreview.svelte';
 	import VoyagerSceneEditor from './VoyagerSceneEditor.svelte';
+	import ModelOptimisationModal from './ModelOptimisationModal.svelte';
 
 	type Props = {
 		edition: RecordModel;
@@ -35,10 +36,11 @@
 	let modelBusy = $state(false);
 	let sceneBusy = $state(false);
 	let editorBusy = $state(false);
+	let optimisationBusy = $state(false);
 	let initializing = $state(false);
 	let initializationError = $state('');
 	$effect(() => {
-		onbusychange?.(modelBusy || sceneBusy || editorBusy || initializing);
+		onbusychange?.(modelBusy || sceneBusy || editorBusy || optimisationBusy || initializing);
 	});
 	onMount(() => {
 		if (
@@ -65,28 +67,36 @@
 
 <div id="edition-assets-panel" class="space-y-4">
 	{#if initializing}
-		<p class="alert alert-info text-sm" role="status">Preparing the accepted proposal models…</p>
+		<p class="alert text-sm alert-info" role="status">Preparing the accepted proposal models…</p>
 	{:else if initializationError}
-		<p class="alert alert-error text-sm" role="alert">{initializationError}</p>
+		<p class="alert text-sm alert-error" role="alert">{initializationError}</p>
 	{/if}
 	<VoyagerPreview
 		{edition}
 		{collectionPubNum}
 		{editionPubNum}
 		title={title || edition.title || 'Edition preview'}
-		onFiles={disabled || initializing || modelBusy || sceneBusy || editorBusy
+		onFiles={disabled || initializing || modelBusy || sceneBusy || editorBusy || optimisationBusy
 			? undefined
 			: (files) => uploaderRef?.uploadFiles(files)}
 	/>
-	<VoyagerSceneEditor
-		{edition}
-		{collectionPubNum}
-		{editionPubNum}
-		title={title || edition.title || 'Edition preview'}
-		disabled={disabled || initializing || modelBusy || sceneBusy}
-		onupdated={handleUpdated}
-		onbusychange={(busy) => (editorBusy = busy)}
-	/>
+	<div class="flex flex-wrap items-start gap-3">
+		<VoyagerSceneEditor
+			{edition}
+			{collectionPubNum}
+			{editionPubNum}
+			title={title || edition.title || 'Edition preview'}
+			disabled={disabled || initializing || modelBusy || sceneBusy || optimisationBusy}
+			onupdated={handleUpdated}
+			onbusychange={(busy) => (editorBusy = busy)}
+		/>
+		<ModelOptimisationModal
+			{edition}
+			disabled={disabled || initializing || modelBusy || sceneBusy || editorBusy}
+			onupdated={handleUpdated}
+			onbusychange={(busy) => (optimisationBusy = busy)}
+		/>
+	</div>
 
 	<div class="rounded-xl border border-base-300 bg-base-100 p-5">
 		<h3 class="mb-3 text-sm font-semibold tracking-wide text-base-content/50 uppercase">
@@ -101,7 +111,7 @@
 				<ModelFilesUpload
 					bind:this={uploaderRef}
 					bind:record={edition}
-					disabled={disabled || initializing || sceneBusy || editorBusy}
+					disabled={disabled || initializing || sceneBusy || editorBusy || optimisationBusy}
 					onbusychange={(busy) => (modelBusy = busy)}
 					onuploaded={handleUpdated}
 					onremoved={handleUpdated}
@@ -111,7 +121,7 @@
 				<div class="mb-1 text-xs text-base-content/60">Scene file (SVX)</div>
 				<SceneDocumentUpload
 					bind:record={edition}
-					disabled={disabled || initializing || modelBusy || editorBusy}
+					disabled={disabled || initializing || modelBusy || editorBusy || optimisationBusy}
 					onbusychange={(busy) => (sceneBusy = busy)}
 					onuploaded={handleUpdated}
 					onremoved={handleUpdated}

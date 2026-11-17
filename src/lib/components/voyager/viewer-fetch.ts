@@ -1,6 +1,6 @@
 export interface ViewerFetchOptions {
 	root: () => string;
-	overrides?: () => { url: string; content: string; contentType?: string }[] | undefined;
+	overrides?: () => { url: string; content: string | Blob; contentType?: string }[] | undefined;
 	companions?: () => { baseDir: string; byBasename: Record<string, string> } | undefined;
 	progress?: (total: number, loaded: number) => void;
 	assetRequest?: (event: ViewerAssetRequestEvent) => void;

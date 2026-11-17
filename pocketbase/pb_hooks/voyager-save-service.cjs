@@ -145,9 +145,13 @@ function prepareSave(e, value) {
 	// Keep prior companions: links from unchanged articles may still reference them. The normal
 	// modelAssets limit bounds retained revisions; failed saves leave the existing scene intact.
 	e.record.set('modelAssets', current.modelAssets.concat(uploads));
+	const rewrittenDocument = require('./model-optimisation-service.cjs').preserveViewingCopy(
+		e,
+		rewrite(document)
+	);
 	e.record.set(
 		'sceneDocument',
-		$filesystem.fileFromBytes(JSON.stringify(rewrite(document)), 'scene.svx.json')
+		$filesystem.fileFromBytes(JSON.stringify(rewrittenDocument), 'scene.svx.json')
 	);
 	return e.next();
 }

@@ -149,11 +149,25 @@ make release      # optional explicitly authorised local release fallback
   `src/lib/utils/content-html.ts`, `src/lib/content.ts`, `src/lib/components/content/`, and
   `pocketbase/pb_hooks/cms-service.cjs`.
 
+## Model Optimisation
+
+- The edition asset editor's model tools process self-contained GLB files in the browser; see
+  [docs/model-optimisation.md](docs/model-optimisation.md) for supported operations and limits.
+- Keep `modelFile` as the source. Viewing copies and previous scene snapshots belong in
+  `modelAssets`; applying or restoring must use the capability-gated optimisation hook with
+  stale-file protection, normal edition permissions and existing workflow/sandbox limits.
+- Lossless repacking must preserve geometry precision, texture pixels and metadata. Texture
+  reduction is explicitly lossy; do not equate technical health with scientific accuracy.
+- Backend hook deployment requires separate production authorisation. Never bypass the capability
+  gate with a direct client-side scene or model replacement.
+
 ## Key Directories
 
 - `src/routes/` - pages, layouts, and endpoints
-- `src/routes/3d-lab/` - experimental Voyager/Kompakkt mesh comparison and externally hosted
-  PlayCanvas SuperSplat sample; separate from published edition viewer choices.
+- `src/routes/3d-lab/` - experimental Voyager/Kompakkt/PlayCanvas comparison, with curated public
+  PURE3D mesh selection in a native PlayCanvas renderer and an external SuperSplat reference.
+  `src/lib/components/playcanvas/` owns the lazy-loaded engine and lab controls; published edition
+  viewer choices are unchanged.
 - `src/lib/` - shared components, database access, types, and utilities
 - `pocketbase/` and `scripts/` - local backend hooks, setup, migrations, and imports
 - `static/voyager/` - Smithsonian Voyager runtime assets

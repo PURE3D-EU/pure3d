@@ -46,7 +46,7 @@
 		/** Geometry path (direct mode) — loads a raw mesh (OBJ/PLY). Ignored when `document` or `model` is set. */
 		geometry?: string;
 		/** Fetch overrides — when Voyager fetches one of these URLs, return the provided content instead. Used to serve rewritten scene JSON at a real HTTP URL. */
-		fetchOverrides?: Array<{ url: string; content: string; contentType?: string }>;
+		fetchOverrides?: Array<{ url: string; content: string | Blob; contentType?: string }>;
 		/**
 		 * Companion asset redirection. When Voyager fetches a URL under `baseDir`, the request's basename
 		 * is looked up in `byBasename` (after normalization) and the original fetch is replaced with one
