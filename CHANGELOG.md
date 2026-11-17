@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.6.0 - 2026-11-17
+
+### Features
+
+- add model optimisation and native PlayCanvas lab (666e29ae)
+- add native PlayCanvas viewer to 3D lab (a5dfddd5)
+
 ## v2.5.1 - 2026-11-13
 
 ### Fixes
