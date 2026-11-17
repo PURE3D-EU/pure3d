@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.6.1 - 2026-11-17
+
+### Fixes
+
+- improve touch scrolling and glide behavior (d6e20648)
+
 ## v2.6.0 - 2026-11-17
 
 ### Features
