@@ -338,8 +338,8 @@
 	#content-renderer.imported :global([data-cms-profile] > img) {
 		object-fit: cover;
 	}
-	#content-renderer.imported :global(img:has(+ img)),
-	#content-renderer.imported :global(img + img) {
+	#content-renderer.imported :global(img:not([width]):has(+ img)),
+	#content-renderer.imported :global(img + img:not([width])) {
 		display: inline-block;
 		width: auto;
 		max-width: min(100%, 12rem);

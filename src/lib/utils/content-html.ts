@@ -5,6 +5,7 @@ import {
 	isCalloutStyle,
 	isCmsColumnCount,
 	normaliseContentImage,
+	normaliseContentImageWidth,
 	normaliseLogoItems,
 	normaliseProfileCards,
 	normaliseProjectFacts,
@@ -20,6 +21,11 @@ purifier?.addHook('afterSanitizeAttributes', (node) => {
 	if (node.tagName === 'A') node.setAttribute('rel', 'noopener noreferrer');
 	if (node.tagName === 'IMG' && node.hasAttribute('src'))
 		node.setAttribute('src', localContentAssetUrl(node.getAttribute('src') || ''));
+	if (
+		node.hasAttribute('width') &&
+		(node.tagName !== 'IMG' || normaliseContentImageWidth(node.getAttribute('width')) === null)
+	)
+		node.removeAttribute('width');
 	for (const attribute of Array.from(node.attributes)) {
 		if (attribute.name === 'data-content-image') {
 			if (node.tagName !== 'FIGURE' || attribute.value !== 'true')
@@ -239,6 +245,7 @@ export function cleanContent(html: string): string {
 			'src',
 			'title',
 			'alt',
+			'width',
 			'target',
 			'rel',
 			'allowfullscreen',

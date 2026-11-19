@@ -37,6 +37,7 @@
 	import {
 		calloutStyles,
 		isCmsColumnCount,
+		maxContentImageWidth,
 		maxEditionReferences,
 		maxLogoItems,
 		maxOpenCallReferences,
@@ -163,6 +164,9 @@
 	let draftFacts = $state<ProjectFact[]>([]);
 	let draftImage = $state<ContentImage>({ src: '', alt: '', caption: '' });
 	let draftImageTitle = $state('');
+	let imageWidthInput = $state<HTMLInputElement>();
+	const editorId = $props.id();
+	const imageWidthId = `${editorId}-image-width`;
 	let draftActions = $state({
 		primaryLabel: '',
 		primaryHref: '',
@@ -645,6 +649,7 @@
 			closeComponentEditor();
 			return;
 		}
+		if (component === 'image' && imageWidthInput && !imageWidthInput.reportValidity()) return;
 		const normalised =
 			component === 'profiles'
 				? normaliseProfileCards(draftProfiles)
@@ -743,6 +748,8 @@
 							...node.attrs,
 							src: draftImage.src,
 							alt: draftImage.alt,
+							width: draftImage.width ?? null,
+							...((draftImage.width ?? null) !== node.attrs.width ? { height: null } : {}),
 							title: draftImageTitle || null
 						});
 				else
@@ -1625,6 +1632,23 @@
 					{#if !draftImage.src && componentEditorTarget}<p class="text-sm">
 							Save to remove this image from the document, or Cancel to keep it.
 						</p>{/if}
+					<div>
+						<label for={imageWidthId}>Image width (px)</label>
+						<input
+							id={imageWidthId}
+							class="input w-full"
+							type="number"
+							min="1"
+							max={maxContentImageWidth}
+							placeholder="Automatic"
+							aria-describedby={`${imageWidthId}-help`}
+							bind:this={imageWidthInput}
+							bind:value={draftImage.width}
+						/>
+						<span id={`${imageWidthId}-help`} class="text-sm opacity-70">
+							Leave blank for automatic sizing. Images shrink to fit smaller screens.
+						</span>
+					</div>
 					<label
 						>Caption<textarea
 							class="textarea-bordered textarea w-full"
@@ -1757,9 +1781,49 @@
 		border: 1px solid var(--color-base-300);
 		border-radius: var(--radius-box);
 	}
-	.editor-wrapper :global(.cms-component-node.ProseMirror-selectednode) {
+	.editor-wrapper :global(.cms-component-node.ProseMirror-selectednode:not(.cms-image-node)) {
 		outline: 2px solid var(--color-primary);
 		outline-offset: 2px;
+	}
+	.editor-wrapper :global(.cms-image-resize-frame) {
+		position: relative;
+		width: fit-content;
+		max-width: 100%;
+	}
+	.editor-wrapper :global(figure[data-content-image] .cms-image-resize-frame) {
+		margin-inline: auto;
+	}
+	.editor-wrapper :global(.cms-image-resize-frame > img) {
+		display: block;
+		max-width: 100%;
+		height: auto;
+		margin: 0;
+	}
+	.editor-wrapper :global(.ProseMirror-selectednode > .cms-image-resize-frame),
+	.editor-wrapper :global(.ProseMirror-selectednode > figure > .cms-image-resize-frame) {
+		outline: 2px solid var(--color-primary);
+	}
+	.editor-wrapper :global(.cms-image-resize-grip) {
+		display: none;
+		position: absolute;
+		right: 0;
+		bottom: 0;
+		width: 24px;
+		height: 24px;
+		transform: translate(50%, 50%);
+		cursor: nwse-resize;
+		touch-action: none;
+	}
+	.editor-wrapper :global(.cms-image-resize-grip::after) {
+		content: '';
+		position: absolute;
+		inset: 8px;
+		background: var(--color-primary);
+		box-shadow: 0 0 0 1px var(--color-base-100);
+	}
+	.editor-wrapper :global(.ProseMirror-selectednode > .cms-image-resize-frame > .cms-image-resize-grip),
+	.editor-wrapper :global(.ProseMirror-selectednode > figure > .cms-image-resize-frame > .cms-image-resize-grip) {
+		display: block;
 	}
 	.editor-wrapper :global(.cms-component-controls) {
 		display: flex;

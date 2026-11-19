@@ -4,7 +4,9 @@ import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import {
 	isCalloutStyle,
 	isCmsColumnCount,
+	maxContentImageWidth,
 	normaliseContentImage,
+	normaliseContentImageWidth,
 	normaliseLogoItems,
 	normaliseProfileCards,
 	normaliseProjectFacts,
@@ -159,6 +161,28 @@ export function withComponentControls(extension: Node) {
 					if (select() !== undefined) editor.commands.deleteSelection();
 				});
 				dom.append(controls, rendered.dom);
+				const image =
+					rendered.dom instanceof HTMLImageElement
+						? rendered.dom
+						: node.type.name === 'contentImageFigure' && rendered.dom instanceof HTMLElement
+							? rendered.dom.querySelector('img')
+							: null;
+				const grip = image
+					? addImageResizeHandle(image, select, (width) => {
+							const position = getPos();
+							if (typeof position !== 'number' || !editor.isEditable) return;
+							const { state, view } = editor;
+							const current = state.doc.nodeAt(position);
+							if (current?.type.name !== node.type.name || current.attrs.width === width) return;
+							const tr = state.tr.setNodeMarkup(position, undefined, {
+								...current.attrs,
+								width,
+								...(current.type.name === 'image' ? { height: null } : {})
+							});
+							view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, position)));
+						})
+					: null;
+				if (grip) dom.classList.add('cms-image-node');
 				if (node.isAtom && rendered.dom instanceof HTMLElement)
 					rendered.dom.contentEditable = 'false';
 				if (rendered.dom instanceof HTMLDetailsElement) rendered.dom.open = true;
@@ -172,7 +196,9 @@ export function withComponentControls(extension: Node) {
 						return true;
 					},
 					stopEvent: (event) =>
-						controls.contains(event.target as globalThis.Node) || !!view?.stopEvent?.(event),
+						event.target === grip ||
+						controls.contains(event.target as globalThis.Node) ||
+						!!view?.stopEvent?.(event),
 					ignoreMutation: (mutation) =>
 						controls.contains(mutation.target) || (node.isAtom && mutation.type !== 'selection'),
 					destroy: () => view?.destroy?.()
@@ -180,6 +206,54 @@ export function withComponentControls(extension: Node) {
 			};
 		}
 	});
+}
+
+function addImageResizeHandle(
+	image: HTMLImageElement,
+	select: () => number | undefined,
+	commit: (width: number) => void
+) {
+	const frame = document.createElement('div');
+	frame.className = 'cms-image-resize-frame';
+	frame.contentEditable = 'false';
+	const grip = document.createElement('span');
+	grip.className = 'cms-image-resize-grip';
+	grip.setAttribute('aria-hidden', 'true'); // The Edit dialog provides the keyboard equivalent.
+	image.replaceWith(frame);
+	frame.append(image, grip);
+	image.draggable = false;
+	image.addEventListener('click', select);
+	const scale = frame.parentElement?.tagName === 'FIGURE' ? 2 : 1; // Captioned images are centred.
+	let drag: { id: number; x: number; width: number; max: number } | undefined;
+	const widthAt = (x: number) =>
+		drag ? Math.max(1, Math.min(drag.max, Math.round(drag.width + (x - drag.x) * scale))) : 1;
+	grip.addEventListener('pointerdown', (event) => {
+		const parent = frame.parentElement;
+		if (!parent || drag || event.button !== 0 || !image.naturalWidth) return;
+		event.preventDefault();
+		const style = getComputedStyle(parent);
+		const max = parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+		drag = {
+			id: event.pointerId,
+			x: event.clientX,
+			width: image.getBoundingClientRect().width,
+			max: Math.min(maxContentImageWidth, Math.floor(max))
+		};
+		grip.setPointerCapture(event.pointerId);
+	});
+	grip.addEventListener('pointermove', (event) => {
+		if (event.pointerId === drag?.id) image.style.width = `${widthAt(event.clientX)}px`;
+	});
+	grip.addEventListener('pointerup', (event) => {
+		if (event.pointerId !== drag?.id) return;
+		const width = widthAt(event.clientX);
+		if (width !== Math.round(drag.width)) commit(width);
+	});
+	grip.addEventListener('lostpointercapture', () => {
+		drag = undefined;
+		image.style.removeProperty('width');
+	});
+	return grip;
 }
 
 function profileCards(element: HTMLElement) {
@@ -336,6 +410,11 @@ export const ContentImageFigure = Node.create({
 			src: { default: '' },
 			alt: { default: '' },
 			title: { default: null },
+			width: {
+				default: null,
+				parseHTML: (element) =>
+					normaliseContentImageWidth(element.querySelector(':scope > img')?.getAttribute('width'))
+			},
 			caption: { default: '' }
 		};
 	},
@@ -358,6 +437,7 @@ export const ContentImageFigure = Node.create({
 				{
 					src: image.src,
 					alt: image.alt,
+					width: image.width,
 					...(HTMLAttributes.title ? { title: HTMLAttributes.title } : {})
 				}
 			],

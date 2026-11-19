@@ -59,3 +59,6 @@
 - 2026-11-17 · OpenCode · Added Delete draft proposal to expanded pipeline details with explicit permanent-deletion confirmation, pending-state protection, fresh status read and success-only list removal. Reuses existing PocketBase delete authorisation; no backend changes or records deleted. Diff whitespace check passed; application tests not requested or run.
 - 2026-11-17 · OpenCode · Added creation date and time to the expanded workflow edition summary using the existing record timestamp and en-GB local-time formatting. Diff whitespace check passed; tests not requested or run.
 - 2026-11-17 · OpenCode · Styled Delete draft proposal as a red outline button; confirmation remains solid red. Tests not requested or run.
+- 2026-11-19 · OpenCode · PURE3D #116: added optional image width in the WYSIWYG image dialog, with responsive sizing and width preserved by HTML sanitisation. Added width validation for CMS image figures; no tests or deployment performed.
+- 2026-11-19 · OpenCode · PURE3D #116: added a selection box and drag handle to resize images directly in the WYSIWYG. The width field remains available for keyboard and precise sizing; no application tests or deployment performed.
+- 2026-11-19 · OpenCode · PURE3D #116: captured the selected image and visible corner handle in the local editor preview; no feedback submitted.

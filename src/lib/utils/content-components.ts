@@ -33,7 +33,10 @@ export interface ContentImage {
 	src: string;
 	alt: string;
 	caption: string;
+	width?: number | null;
 }
+
+export const maxContentImageWidth = 9999;
 
 const editionIdPattern = /^[a-zA-Z0-9_-]{1,64}$/;
 const pocketbaseIdPattern = /^[a-z0-9]{15}$/;
@@ -230,6 +233,13 @@ export function normaliseProjectFacts(value: unknown): ProjectFact[] {
 	return facts.every((fact) => fact && !Array.isArray(fact)) ? (facts as ProjectFact[]) : [];
 }
 
+export function normaliseContentImageWidth(value: unknown): number | null {
+	if (typeof value !== 'number' && typeof value !== 'string') return null;
+	if (typeof value === 'string' && !/^[1-9][0-9]*$/.test(value)) return null;
+	const width = Number(value);
+	return Number.isInteger(width) && width > 0 && width <= maxContentImageWidth ? width : null;
+}
+
 export function normaliseContentImage(value: unknown): ContentImage | null {
 	if (!value || typeof value !== 'object') return null;
 	const image = value as Partial<ContentImage>;
@@ -238,5 +248,5 @@ export function normaliseContentImage(value: unknown): ContentImage | null {
 	const alt = optionalText(image.alt, 240);
 	const caption = optionalText(image.caption, 500);
 	if (alt === null || caption === null) return null;
-	return { src, alt, caption };
+	return { src, alt, caption, width: normaliseContentImageWidth(image.width) };
 }

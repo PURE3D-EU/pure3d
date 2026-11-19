@@ -206,6 +206,8 @@ function validateComponentHtml(html) {
 		const image = figure[2].match(/<img\b[^>]*>/i)?.[0];
 		if (!image || !safeComponentImageUrl(attribute(image, 'src') || ''))
 			return 'Invalid content component.';
+		const width = attribute(image, 'width');
+		if (width !== null && !/^[1-9][0-9]{0,3}$/.test(width)) return 'Invalid content image width.';
 	}
 	for (const tag of html.matchAll(/<div\b[^>]*\bdata-cms-project-fact=(['"])true\1[^>]*>/gi)) {
 		const value = tag[0];
