@@ -61,7 +61,11 @@
 	});
 
 	function reveal(node: HTMLElement, delay = 0) {
-		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return {};
+		if (
+			window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+			!('IntersectionObserver' in window)
+		)
+			return {};
 		node.style.setProperty('--reveal-delay', `${delay}ms`);
 		node.classList.add('reveal-pending');
 		const observer = new IntersectionObserver(
@@ -221,7 +225,7 @@
 		<ParticleHero copy={heroCopy} {glyphs} minimal />
 	</section>
 
-	<HomeOpenCalls />
+	<HomeOpenCalls {reveal} />
 	{@render latestNews()}
 
 	<section class="evidence" aria-labelledby="home3-evidence">

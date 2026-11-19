@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import type { Action } from 'svelte/action';
 	import { resolve } from '$app/paths';
 	import type { RecordModel } from 'pocketbase';
 	import { pb } from '$lib/database/client';
 	import { cleanContent } from '$lib/utils/content-html';
 	import ContentRenderer from './ContentRenderer.svelte';
 
-	let { calls }: { calls: RecordModel[] } = $props();
+	let {
+		calls,
+		reveal = () => {}
+	}: { calls: RecordModel[]; reveal?: Action<HTMLElement, number | undefined> } = $props();
 	let selected = $state<RecordModel | null>(null);
 	let dialog: HTMLDialogElement;
 	const instanceId = $props.id();
@@ -40,37 +44,39 @@
 
 <div id="open-call-cards">
 	<div class="calls-grid not-prose">
-		{#each calls as call (call.id)}
+		{#each calls as call, index (call.id)}
 			{@const description = excerpt(call)}
-			<article class="call-card">
+			<article class="call-card" use:reveal={(index + 1) * 80}>
 				{#if call.cover}
-					<img
-						class="call-cover"
-						src={pb.files.getURL(call, call.cover)}
-						alt=""
-						loading="lazy"
-						width="800"
-						height="800"
-					/>
+					<div class="call-cover">
+						<img
+							src={pb.files.getURL(call, call.cover)}
+							alt=""
+							loading={index === 0 ? 'eager' : 'lazy'}
+							decoding="async"
+							width="192"
+							height="192"
+						/>
+					</div>
 				{/if}
-				<div class="card-top">
-					<span>Thematic call</span>
-				</div>
-				<h3>{call.title}</h3>
-				{#if description}<p class="excerpt">{description}</p>{/if}
-				<div class="card-footer">
-					<div class="deadline">
-						<span>{call.deadline ? 'Proposal deadline' : 'Applications'}</span><strong
-							>{call.deadline ? date(call.deadline) : 'Open'}</strong
+				<div class="card-content">
+					<div class="card-top">Thematic call</div>
+					<h3>{call.title}</h3>
+					{#if description}<p class="excerpt">{description}</p>{/if}
+					<div class="card-footer">
+						<div class="deadline">
+							<span>{call.deadline ? 'Proposal deadline' : 'Applications'}</span><strong
+								>{call.deadline ? date(call.deadline) : 'Open'}</strong
+							>
+						</div>
+						<button
+							type="button"
+							onclick={() => openCall(call)}
+							aria-label={`Read call: ${call.title}`}
+							aria-haspopup="dialog"
+							>Read call <span class="arrow" aria-hidden="true">↗</span></button
 						>
 					</div>
-					<button
-						type="button"
-						onclick={() => openCall(call)}
-						aria-label={`Read call: ${call.title}`}
-						aria-haspopup="dialog"
-						>Read call <span class="arrow" aria-hidden="true">↗</span></button
-					>
 				</div>
 			</article>
 		{/each}
@@ -120,37 +126,57 @@
 		text-transform: uppercase;
 	}
 	.calls-grid {
+		container-type: inline-size;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(100%, max(18rem, (100% - 20px) / 2)), 1fr));
-		gap: 20px;
+		max-width: 64rem;
+		gap: 16px;
 	}
 	.call-card {
-		display: flex;
-		flex-direction: column;
+		--cover-size: 8rem;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 16px;
 		position: relative;
-		padding: clamp(24px, 3vw, 36px);
+		padding: 16px;
 		border-radius: 4px;
 		background: var(--color-base-100);
 		border-top: 2px solid var(--color-forest);
 	}
-	.card-top {
+	.card-content {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 16px;
-		margin-bottom: 28px;
+		min-width: 0;
+		flex-direction: column;
+	}
+	.card-top {
+		margin-bottom: 8px;
 		font-size: 10px;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--color-ink-3);
 	}
-	#open-call-cards .call-cover {
-		width: calc(100% + 2 * clamp(24px, 3vw, 36px));
-		max-width: none;
+	.call-cover {
+		align-self: start;
+		width: min(100%, var(--cover-size));
 		aspect-ratio: 1;
+		overflow: hidden;
+		border-radius: 4px;
+		background: var(--color-base-200);
+	}
+	#open-call-cards .call-cover img {
+		display: block;
+		width: 100%;
+		height: 100%;
 		object-fit: contain;
-		margin: calc(-1 * clamp(24px, 3vw, 36px)) calc(-1 * clamp(24px, 3vw, 36px)) 28px;
-		border-radius: 4px 4px 0 0;
+	}
+	@container (min-width: 36rem) {
+		.call-card {
+			--cover-size: 12rem;
+			gap: 24px;
+			padding: 24px;
+		}
+		.call-card:has(.call-cover) {
+			grid-template-columns: var(--cover-size) minmax(0, 1fr);
+		}
 	}
 	.dialog-cover {
 		width: 100%;
@@ -161,8 +187,8 @@
 		border-radius: var(--radius-control);
 	}
 	h3 {
-		max-width: 30ch;
-		margin: 0 0 18px;
+		margin: 0 0 8px;
+		overflow-wrap: anywhere;
 		font-size: clamp(21px, 2vw, 27px);
 		font-weight: 500;
 		line-height: 1.22;
@@ -172,7 +198,7 @@
 	.excerpt {
 		max-width: 54ch;
 		overflow-wrap: anywhere;
-		margin: 0 0 30px;
+		margin: 0 0 16px;
 		color: var(--color-ink-3);
 		font-size: 14px;
 		line-height: 1.65;
@@ -182,9 +208,9 @@
 		flex-wrap: wrap;
 		align-items: end;
 		justify-content: space-between;
-		gap: 20px;
+		gap: 12px;
 		margin-top: auto;
-		padding-top: 22px;
+		padding-top: 12px;
 		border-top: 1px solid var(--rule);
 	}
 	.deadline {
@@ -294,15 +320,6 @@
 		font-weight: 500;
 	}
 	@media (max-width: 640px) {
-		.card-top {
-			margin-bottom: 22px;
-		}
-		h3 {
-			max-width: none;
-		}
-		.card-footer {
-			gap: 12px;
-		}
 		.deadline strong {
 			font-size: 17px;
 		}

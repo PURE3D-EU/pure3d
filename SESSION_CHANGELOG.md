@@ -68,3 +68,10 @@
 - 2026-11-19 · OpenCode · Reused the homepage open-call cards and dialog for documentation and CMS embeds, preserving each location's selection and ordering. No application tests or deployment.
 - 2026-11-19 · OpenCode · After explicit authorisation, started the production `open_calls` cover and short description migration with a required verified backup and schema readback.
 - 2026-11-19 · OpenCode · Production migration completed after backup `open-call-presentation-before-1795094243951.zip` passed integrity checks. Verified both optional fields in the live schema and public API response; existing fields and permissions preserved, no call records edited.
+- 2026-11-19 · OpenCode · Diagnosed missing short description in the live editor: Pages serves v2.6.1 from before the editor change, and GitHub `main` does not contain the local open-call commits. No push or deployment performed.
+- 2026-11-19 · OpenCode · Rebased three local commits onto the v2.6.1 release and pushed `aa12e0a` to GitHub `main`. Verified the remote head and automatic release run `44541041302` in progress; production still served v2.6.1.
+- 2026-11-19 · OpenCode · Added a cover thumbnail beside each open call with artwork in the admin list; uploads remain in the editor. Not deployed.
+- 2026-11-19 · OpenCode · Made shared public open-call cards compact and horizontal in wide containers, with smaller uncropped covers on narrow screens. Modal unchanged; not deployed.
+- 2026-11-19 · OpenCode · Applied the existing homepage scroll reveal to the Thematic Calls heading and cards, and reserved fixed square cover frames before image loading. No deployment.
+- 2026-11-19 · OpenCode · Verified PURE3D’s public OVHcloud mail settings and drafted partner-facing mailbox setup instructions. No email sent or mailbox access attempted.
+- 2026-11-19 · OpenCode · Checked the OVHcloud MCP tool catalogue for a mailbox password reset. No supported reset tool was exposed; no credentials changed.

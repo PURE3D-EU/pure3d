@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Action } from 'svelte/action';
 	import type { RecordModel } from 'pocketbase';
 	import { pb } from '$lib/database/client';
 	import OpenCallCards from './OpenCallCards.svelte';
 
+	let { reveal }: { reveal: Action<HTMLElement, number | undefined> } = $props();
 	let calls = $state<RecordModel[]>([]);
 
 	onMount(async () => {
@@ -24,13 +26,13 @@
 	{#if calls.length}
 		<section aria-labelledby="home-open-calls-title" class="calls-section">
 			<div class="calls-shell">
-				<header class="calls-heading">
+				<header class="calls-heading" use:reveal>
 					<p class="eyebrow">
 						<span class="signal" aria-hidden="true"></span> Open for proposals
 					</p>
 					<h2 id="home-open-calls-title">Thematic Calls</h2>
 				</header>
-				<OpenCallCards {calls} />
+				<OpenCallCards {calls} {reveal} />
 			</div>
 		</section>
 	{/if}

@@ -326,13 +326,25 @@
 					<li
 						class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-base-300 p-5"
 					>
-						<div>
-							<h2 class="font-semibold">{call.title}</h2>
-							<p class="mt-1 text-xs opacity-60">
-								{call.isPublished ? 'Published' : 'Draft'}{call.deadline
-									? ` · Deadline ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(call.deadline))}`
-									: ''} · Order {call.order || 0}
-							</p>
+						<div class="flex min-w-0 items-center gap-4">
+							{#if call.cover}
+								<img
+									src={pb.files.getURL(call, call.cover)}
+									alt=""
+									loading="lazy"
+									width="48"
+									height="48"
+									class="size-12 shrink-0 rounded object-contain"
+								/>
+							{/if}
+							<div class="min-w-0 wrap-anywhere">
+								<h2 class="font-semibold">{call.title}</h2>
+								<p class="mt-1 text-xs opacity-60">
+									{call.isPublished ? 'Published' : 'Draft'}{call.deadline
+										? ` · Deadline ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(call.deadline))}`
+										: ''} · Order {call.order || 0}
+								</p>
+							</div>
 						</div>
 						<div class="flex gap-2">
 							<button class="btn btn-sm" onclick={() => edit(call)}>Edit</button><button
