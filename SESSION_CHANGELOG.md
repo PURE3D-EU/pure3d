@@ -65,3 +65,6 @@
 - 2026-11-19 · OpenCode · Linked PURE3D #126 (open-call cover image) and #125 (open-call short description) to this session; no implementation or GitHub changes.
 - 2026-11-19 · OpenCode · PURE3D #125/#126: added optional short descriptions to admin and public open-call cards, kept existing cover display, and made cover files reselectable. Prepared an additive schema migration for both fields; no migration, deployment or application tests run.
 - 2026-11-19 · OpenCode · Read-only production preflight confirmed `open_calls` is missing cover and short description fields; recent updates to existing fields succeeded. Production schema and records unchanged pending migration authorisation.
+- 2026-11-19 · OpenCode · Reused the homepage open-call cards and dialog for documentation and CMS embeds, preserving each location's selection and ordering. No application tests or deployment.
+- 2026-11-19 · OpenCode · After explicit authorisation, started the production `open_calls` cover and short description migration with a required verified backup and schema readback.
+- 2026-11-19 · OpenCode · Production migration completed after backup `open-call-presentation-before-1795094243951.zip` passed integrity checks. Verified both optional fields in the live schema and public API response; existing fields and permissions preserved, no call records edited.

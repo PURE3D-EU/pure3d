@@ -3,7 +3,7 @@
 Open calls are records in `open_calls`, editable by administrators under **Admin → Open Calls**.
 Each record has a title, optional short description, cover image and deadline, rich-text body,
 publication flag and sort order. The short description is plain text, up to 300 characters, and
-appears on homepage cards and embedded calls. If it is left blank, homepage cards keep using an
+appears on homepage cards and embedded calls. If it is left blank, cards keep using an
 excerpt from the body where available.
 Upload square cover artwork under **Admin → Open Calls** (JPEG, PNG or WebP, up to 10 MB).
 Cards show the complete artwork without cropping; calls without covers retain their text layout.
@@ -31,7 +31,8 @@ proposals cannot be deleted; unpublish a call instead, or remove its references 
 
 The landing page automatically displays published calls immediately below the hero, in display
 order, excluding calls whose deadline has passed (UTC calendar date). Calls without a deadline stay
-visible. Each card opens the live rich-text body and example editions in a keyboard-accessible dialog.
+visible. The homepage and embedded calls use the same cards and keyboard-accessible dialog for the
+live rich-text body and example editions.
 The section is hidden when there are no current calls or the backend is unavailable.
 
 Proposals optionally reference a call through `editions.proposalOpenCall`; an empty relation means

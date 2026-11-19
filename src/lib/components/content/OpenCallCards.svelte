@@ -9,7 +9,8 @@
 	let { calls }: { calls: RecordModel[] } = $props();
 	let selected = $state<RecordModel | null>(null);
 	let dialog: HTMLDialogElement;
-	const titleId = `${$props.id()}-title`;
+	const instanceId = $props.id();
+	const titleId = `${instanceId}-title`;
 	const date = (value: string) =>
 		new Intl.DateTimeFormat('en-GB', {
 			day: 'numeric',
@@ -38,47 +39,43 @@
 </script>
 
 <div id="open-call-cards">
-				<div class="calls-grid not-prose">
-					{#each calls as call (call.id)}
-						{@const description = excerpt(call)}
-						<article class="call-card">
-							{#if call.cover}
-								<img
-									class="call-cover"
-									src={pb.files.getURL(call, call.cover)}
-									alt=""
-									loading="lazy"
-									width="800"
-									height="800"
-								/>
-							{/if}
-							<div class="card-top">
-								<span>Thematic call</span>
-							</div>
-							<h3>{call.title}</h3>
-							{#if description}<p class="excerpt">{description}</p>{/if}
-							<div class="card-footer">
-								<div class="deadline">
-									<span>{call.deadline ? 'Proposal deadline' : 'Applications'}</span><strong
-										>{call.deadline ? date(call.deadline) : 'Open'}</strong
-									>
-								</div>
-								<button
-									type="button"
-									onclick={() => openCall(call)}
-									aria-label={`Read call: ${call.title}`}
-									aria-haspopup="dialog"
-									>Read call <span class="arrow" aria-hidden="true">↗</span></button
-								>
-							</div>
-						</article>
-					{/each}
+	<div class="calls-grid not-prose">
+		{#each calls as call (call.id)}
+			{@const description = excerpt(call)}
+			<article class="call-card">
+				{#if call.cover}
+					<img
+						class="call-cover"
+						src={pb.files.getURL(call, call.cover)}
+						alt=""
+						loading="lazy"
+						width="800"
+						height="800"
+					/>
+				{/if}
+				<div class="card-top">
+					<span>Thematic call</span>
 				</div>
-	<dialog
-		bind:this={dialog}
-		aria-labelledby={titleId}
-		onclose={() => (selected = null)}
-	>
+				<h3>{call.title}</h3>
+				{#if description}<p class="excerpt">{description}</p>{/if}
+				<div class="card-footer">
+					<div class="deadline">
+						<span>{call.deadline ? 'Proposal deadline' : 'Applications'}</span><strong
+							>{call.deadline ? date(call.deadline) : 'Open'}</strong
+						>
+					</div>
+					<button
+						type="button"
+						onclick={() => openCall(call)}
+						aria-label={`Read call: ${call.title}`}
+						aria-haspopup="dialog"
+						>Read call <span class="arrow" aria-hidden="true">↗</span></button
+					>
+				</div>
+			</article>
+		{/each}
+	</div>
+	<dialog bind:this={dialog} aria-labelledby={titleId} onclose={() => (selected = null)}>
 		{#if selected}
 			<div class="dialog-toolbar not-prose">
 				<span class="eyebrow">Thematic call</span><button
@@ -90,10 +87,10 @@
 			</div>
 			<div class="dialog-body">
 				{#if selected.cover}
-					<img class="dialog-cover" src={pb.files.getURL(selected, selected.cover)} alt="" />
+					<img class="dialog-cover not-prose" src={pb.files.getURL(selected, selected.cover)} alt="" />
 				{/if}
 				<h2 id={titleId} class="not-prose">{selected.title}</h2>
-				{#if selected.deadline}<p class="dialog-deadline">
+				{#if selected.deadline}<p class="dialog-deadline not-prose">
 						Proposal deadline · {date(selected.deadline)}
 					</p>{/if}
 				{#key selected.id}<ContentRenderer
@@ -111,6 +108,8 @@
 <style>
 	#open-call-cards {
 		--rule: color-mix(in srgb, var(--color-base-content) 12%, transparent);
+		font-family: var(--font-sans);
+		line-height: 1.5;
 	}
 	.eyebrow {
 		display: flex;
@@ -122,7 +121,7 @@
 	}
 	.calls-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, max(18rem, (100% - 20px) / 2)), 1fr));
 		gap: 20px;
 	}
 	.call-card {
@@ -145,7 +144,7 @@
 		text-transform: uppercase;
 		color: var(--color-ink-3);
 	}
-	.call-cover {
+	#open-call-cards .call-cover {
 		width: calc(100% + 2 * clamp(24px, 3vw, 36px));
 		max-width: none;
 		aspect-ratio: 1;
@@ -155,9 +154,11 @@
 	}
 	.dialog-cover {
 		width: 100%;
+		height: auto;
 		max-height: 60dvh;
 		object-fit: contain;
 		margin-bottom: 28px;
+		border-radius: var(--radius-control);
 	}
 	h3 {
 		max-width: 30ch;
@@ -178,6 +179,7 @@
 	}
 	.card-footer {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: end;
 		justify-content: space-between;
 		gap: 20px;
