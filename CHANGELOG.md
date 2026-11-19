@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.7.0 - 2026-11-19
+
+### Features
+
+- reuse homepage cards for embedded calls (aa12e0a9)
+- add short descriptions to call cards (b1a8d58a)
+- add image resizing and width controls (fea57f78)
+
 ## v2.6.1 - 2026-11-17
 
 ### Fixes
