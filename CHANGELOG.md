@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.8.0 - 2026-11-19
+
+### Features
+
+- compact cards and reveal them on scroll (6ce0a357)
+
 ## v2.7.0 - 2026-11-19
 
 ### Features
