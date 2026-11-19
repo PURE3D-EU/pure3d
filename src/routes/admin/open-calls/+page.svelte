@@ -13,6 +13,7 @@
 	let selected = $state<RecordModel | null>(null);
 	let creating = $state(false);
 	let title = $state('');
+	let shortDescription = $state('');
 	let body = $state('');
 	let cover = $state<File | null>(null);
 	let coverPreview = $state('');
@@ -72,6 +73,7 @@
 		cover = null;
 		removeCover = false;
 		title = '';
+		shortDescription = '';
 		body = '';
 		deadline = '';
 		isPublished = false;
@@ -86,6 +88,7 @@
 		removeCover = false;
 		creating = false;
 		title = call.title || '';
+		shortDescription = call.shortDescription || '';
 		body = cleanContent(call.body || '');
 		deadline = call.deadline?.slice(0, 10) || '';
 		isPublished = Boolean(call.isPublished);
@@ -110,6 +113,7 @@
 		try {
 			const payload = {
 				title: title.trim(),
+				shortDescription: shortDescription.trim(),
 				body: cleanContent(body),
 				deadline: deadline ? `${deadline}T00:00:00.000Z` : '',
 				isPublished,
@@ -203,6 +207,21 @@
 							oninput={() => (dirty = true)}
 						/></label
 					>
+					<label class="block text-sm font-medium">
+						Short description <span class="font-normal opacity-65">(optional)</span>
+						<textarea
+							class="textarea mt-2 w-full"
+							maxlength="300"
+							rows="3"
+							bind:value={shortDescription}
+							oninput={() => (dirty = true)}
+							aria-describedby="call-description-help"
+						></textarea>
+					</label>
+					<p id="call-description-help" class="text-xs opacity-65">
+						Introduce the call in up to 300 characters. This appears on the homepage and in
+						embedded open calls.
+					</p>
 					<div>
 						<h2 class="mb-3 text-sm font-medium">Content</h2>
 						{#key selected?.id || 'new'}
@@ -230,6 +249,7 @@
 								alt="Cover preview"
 								class="aspect-square w-full rounded object-contain"
 							/>
+							{#if cover}<p class="break-all text-sm">{cover.name}</p>{/if}
 							<button
 								type="button"
 								class="btn btn-sm"
@@ -247,13 +267,13 @@
 							class="file-input w-full"
 							onchange={(event) => {
 								const file = event.currentTarget.files?.[0];
+								event.currentTarget.value = '';
 								if (!file) return;
 								if (
 									!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
 									file.size > 10000000
 								) {
 									toast.error('Choose a JPEG, PNG or WebP image up to 10 MB.');
-									event.currentTarget.value = '';
 									return;
 								}
 								cover = file;

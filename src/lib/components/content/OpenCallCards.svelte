@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { RecordModel } from 'pocketbase';
 	import { pb } from '$lib/database/client';
 	import { cleanContent } from '$lib/utils/content-html';
 	import ContentRenderer from './ContentRenderer.svelte';
 
-	let calls = $state<(RecordModel & { excerpt: string })[]>([]);
+	let { calls }: { calls: RecordModel[] } = $props();
 	let selected = $state<RecordModel | null>(null);
 	let dialog: HTMLDialogElement;
+	const titleId = `${$props.id()}-title`;
 	const date = (value: string) =>
 		new Intl.DateTimeFormat('en-GB', {
 			day: 'numeric',
@@ -17,33 +18,17 @@
 			timeZone: 'UTC'
 		}).format(new Date(value));
 
-	onMount(async () => {
-		try {
-			const records = await pb.collection('open_calls').getFullList({
-				filter: pb.filter('isPublished = true && (deadline = "" || deadline >= {:today})', {
-					today: `${new Date().toISOString().slice(0, 10)} 00:00:00.000Z`
-				}),
-				sort: 'order,deadline,title'
-			});
-			calls = records.map((call) => {
-				const document = new DOMParser().parseFromString(
-					cleanContent(call.body || ''),
-					'text/html'
-				);
-				const paragraph =
-					Array.from(document.querySelectorAll('p'))
-						.find((node) => (node.textContent?.trim().length || 0) > 100)
-						?.textContent?.replace(/\s+/g, ' ')
-						.trim() || '';
-				const excerpt =
-					paragraph.length > 175 ? `${paragraph.slice(0, 175).replace(/\s+\S*$/, '')}…` : paragraph;
-				return { ...call, excerpt };
-			});
-		} catch {
-			// Keep the rest of the landing page available if calls cannot be loaded.
-			calls = [];
-		}
-	});
+	function excerpt(call: RecordModel) {
+		const description = call.shortDescription?.trim();
+		if (description) return description;
+		const document = new DOMParser().parseFromString(cleanContent(call.body || ''), 'text/html');
+		const paragraph =
+			Array.from(document.querySelectorAll('p'))
+				.find((node) => (node.textContent?.trim().length || 0) > 100)
+				?.textContent?.replace(/\s+/g, ' ')
+				.trim() || '';
+		return paragraph.length > 175 ? `${paragraph.slice(0, 175).replace(/\s+\S*$/, '')}…` : paragraph;
+	}
 
 	async function openCall(call: RecordModel) {
 		selected = call;
@@ -52,20 +37,10 @@
 	}
 </script>
 
-<div id="home-open-calls">
-	{#if calls.length}
-		<section aria-labelledby="home-open-calls-title" class="calls-section">
-			<div class="calls-shell">
-				<header class="calls-heading">
-					<div>
-						<p class="eyebrow">
-							<span class="signal" aria-hidden="true"></span> Open for proposals
-						</p>
-						<h2 id="home-open-calls-title">Thematic Calls</h2>
-					</div>
-				</header>
-				<div class="calls-grid">
+<div id="open-call-cards">
+				<div class="calls-grid not-prose">
 					{#each calls as call (call.id)}
+						{@const description = excerpt(call)}
 						<article class="call-card">
 							{#if call.cover}
 								<img
@@ -81,7 +56,7 @@
 								<span>Thematic call</span>
 							</div>
 							<h3>{call.title}</h3>
-							{#if call.excerpt}<p class="excerpt">{call.excerpt}</p>{/if}
+							{#if description}<p class="excerpt">{description}</p>{/if}
 							<div class="card-footer">
 								<div class="deadline">
 									<span>{call.deadline ? 'Proposal deadline' : 'Applications'}</span><strong
@@ -99,16 +74,13 @@
 						</article>
 					{/each}
 				</div>
-			</div>
-		</section>
-	{/if}
 	<dialog
 		bind:this={dialog}
-		aria-labelledby="home-call-dialog-title"
+		aria-labelledby={titleId}
 		onclose={() => (selected = null)}
 	>
 		{#if selected}
-			<div class="dialog-toolbar">
+			<div class="dialog-toolbar not-prose">
 				<span class="eyebrow">Thematic call</span><button
 					type="button"
 					class="close-button"
@@ -120,7 +92,7 @@
 				{#if selected.cover}
 					<img class="dialog-cover" src={pb.files.getURL(selected, selected.cover)} alt="" />
 				{/if}
-				<h2 id="home-call-dialog-title">{selected.title}</h2>
+				<h2 id={titleId} class="not-prose">{selected.title}</h2>
 				{#if selected.deadline}<p class="dialog-deadline">
 						Proposal deadline · {date(selected.deadline)}
 					</p>{/if}
@@ -128,7 +100,7 @@
 						content={selected.body || ''}
 						renderOpenCalls={false}
 					/>{/key}
-				<a class="btn mt-8 btn-primary" href={resolve('/documentation/submission')}
+				<a class="not-prose btn mt-8 btn-primary" href={resolve('/documentation/submission')}
 					>Read submission guidelines <span aria-hidden="true">→</span></a
 				>
 			</div>
@@ -137,22 +109,8 @@
 </div>
 
 <style>
-	.calls-section {
-		background: var(--color-base-200);
-		border-bottom: 1px solid var(--rule);
-		padding: clamp(48px, 6vw, 88px) 0;
-	}
-	.calls-shell {
-		max-width: 1320px;
-		margin: 0 auto;
-		padding: 0 clamp(20px, 4vw, 48px);
-	}
-	.calls-heading {
-		display: flex;
-		align-items: end;
-		justify-content: space-between;
-		gap: 32px;
-		margin-bottom: 34px;
+	#open-call-cards {
+		--rule: color-mix(in srgb, var(--color-base-content) 12%, transparent);
 	}
 	.eyebrow {
 		display: flex;
@@ -162,20 +120,9 @@
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 	}
-	.signal {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--color-vermillion-ink);
-	}
-	h2 {
-		margin: 17px 0 0;
-		font: 500 clamp(34px, 4vw, 52px) / 1.04 var(--font-sans);
-		letter-spacing: -0.045em;
-	}
 	.calls-grid {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
 		gap: 20px;
 	}
 	.call-card {
@@ -223,6 +170,7 @@
 	}
 	.excerpt {
 		max-width: 54ch;
+		overflow-wrap: anywhere;
 		margin: 0 0 30px;
 		color: var(--color-ink-3);
 		font-size: 14px;
@@ -331,7 +279,9 @@
 	}
 	.dialog-body h2 {
 		margin: 0;
+		font-family: var(--font-sans);
 		font-size: clamp(28px, 4vw, 40px);
+		font-weight: 500;
 		line-height: 1.15;
 		letter-spacing: -0.035em;
 	}
@@ -342,14 +292,6 @@
 		font-weight: 500;
 	}
 	@media (max-width: 640px) {
-		.calls-heading {
-			align-items: start;
-			flex-direction: column;
-			gap: 24px;
-		}
-		.calls-grid {
-			grid-template-columns: minmax(0, 1fr);
-		}
 		.card-top {
 			margin-bottom: 22px;
 		}

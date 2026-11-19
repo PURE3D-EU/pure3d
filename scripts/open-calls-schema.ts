@@ -2,17 +2,20 @@ import PocketBase, { ClientResponseError } from 'pocketbase';
 
 export const openCallsAdminRule = '@request.auth.id != "" && @request.auth.role = "admin"';
 export const openCallsReadRule = `isPublished = true || (${openCallsAdminRule})`;
-export const openCallCoverField = {
-	name: 'cover',
-	type: 'file',
-	maxSelect: 1,
-	maxSize: 10000000,
-	mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-	protected: false
-};
+export const openCallPresentationFields = [
+	{
+		name: 'cover',
+		type: 'file',
+		maxSelect: 1,
+		maxSize: 10000000,
+		mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+		protected: false
+	},
+	{ name: 'shortDescription', type: 'text', required: false, max: 300 }
+];
 export const openCallsFields = [
 	{ name: 'title', type: 'text', required: true, max: 500 },
-	openCallCoverField,
+	...openCallPresentationFields,
 	{ name: 'body', type: 'editor', maxSize: 2000000 },
 	{ name: 'deadline', type: 'date' },
 	{ name: 'isPublished', type: 'bool' },
@@ -24,9 +27,13 @@ export const openCallsFields = [
 export async function ensureOpenCalls(pb: PocketBase) {
 	try {
 		const existing = await pb.collections.getOne('open_calls');
+		const missing = [];
 		for (const field of openCallsFields) {
 			const actual = existing.fields.find((candidate) => candidate.name === field.name);
-			if (!actual && field.name === 'cover') continue;
+			if (!actual && openCallPresentationFields.some(({ name }) => name === field.name)) {
+				missing.push(field);
+				continue;
+			}
 			if (
 				!actual ||
 				Object.entries(field).some(
@@ -43,9 +50,9 @@ export async function ensureOpenCalls(pb: PocketBase) {
 			)
 		)
 			throw new Error('Existing open_calls permissions differ. Reconcile manually.');
-		return existing.fields.some((field) => field.name === 'cover')
-			? existing
-			: pb.collections.update(existing.id, { fields: [...existing.fields, openCallCoverField] });
+		return missing.length
+			? pb.collections.update(existing.id, { fields: [...existing.fields, ...missing] })
+			: existing;
 	} catch (error) {
 		if (!(error instanceof ClientResponseError) || error.status !== 404) throw error;
 	}

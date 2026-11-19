@@ -62,3 +62,6 @@
 - 2026-11-19 · OpenCode · PURE3D #116: added optional image width in the WYSIWYG image dialog, with responsive sizing and width preserved by HTML sanitisation. Added width validation for CMS image figures; no tests or deployment performed.
 - 2026-11-19 · OpenCode · PURE3D #116: added a selection box and drag handle to resize images directly in the WYSIWYG. The width field remains available for keyboard and precise sizing; no application tests or deployment performed.
 - 2026-11-19 · OpenCode · PURE3D #116: captured the selected image and visible corner handle in the local editor preview; no feedback submitted.
+- 2026-11-19 · OpenCode · Linked PURE3D #126 (open-call cover image) and #125 (open-call short description) to this session; no implementation or GitHub changes.
+- 2026-11-19 · OpenCode · PURE3D #125/#126: added optional short descriptions to admin and public open-call cards, kept existing cover display, and made cover files reselectable. Prepared an additive schema migration for both fields; no migration, deployment or application tests run.
+- 2026-11-19 · OpenCode · Read-only production preflight confirmed `open_calls` is missing cover and short description fields; recent updates to existing fields succeeded. Production schema and records unchanged pending migration authorisation.

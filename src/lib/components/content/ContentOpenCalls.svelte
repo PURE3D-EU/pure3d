@@ -55,10 +55,21 @@
 							height="80"
 							class="aspect-square w-20 shrink-0 rounded object-contain"
 						/>{/if}
-					<span class="font-semibold">{call.title}</span>
+					<span class="min-w-0 wrap-anywhere">
+						<span class="block font-semibold">{call.title}</span>
+						{#if call.shortDescription?.trim()}
+							<span class="mt-1 block text-sm opacity-70">{call.shortDescription}</span>
+						{/if}
+						{#if call.deadline}
+							<span class="mt-1 block text-sm opacity-65 sm:hidden">
+								Deadline {deadline(call.deadline)}
+							</span>
+						{/if}
+					</span>
 				</span>
 				<span class="flex shrink-0 items-center gap-3 text-sm opacity-65">
-					{#if call.deadline}<span>Deadline {deadline(call.deadline)}</span>{/if}
+					{#if call.deadline}<span class="hidden sm:inline">Deadline {deadline(call.deadline)}</span
+						>{/if}
 					<span aria-hidden="true" class="text-lg transition-transform group-open:rotate-45">+</span
 					>
 				</span>
