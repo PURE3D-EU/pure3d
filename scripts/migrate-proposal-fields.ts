@@ -13,6 +13,7 @@ if (!definition) throw new Error('Editions schema is missing.');
 const proposalFieldNames = new Set([
 	'proposalType',
 	'proposalPurpose',
+	'proposalModelReferences',
 	'proposalArgument',
 	'proposalThreeDRationale',
 	'proposalAudience',

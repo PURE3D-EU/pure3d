@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { pb } from '$lib/database/client';
 	import type { RecordModel } from 'pocketbase';
-	import VoyagerPreview from './VoyagerPreview.svelte';
 	import TrashIcon from '~icons/lucide/trash-2';
 
 	type Model = { file: string; assets: string[]; scene?: string };
@@ -25,21 +24,19 @@
 	let error = $state('');
 	let input: HTMLInputElement | undefined = $state();
 	let models = $derived(readModels(edition.proposalModels));
-	let previewToken = $state('');
-	const hasModels = $derived(models.length > 0);
-	$effect(() => {
-		if (!hasModels) return;
-		let cancelled = false;
-		void pb.files.getToken().then(
-			(token) => {
-				if (!cancelled) previewToken = token;
-			},
-			() => {
-				if (!cancelled) error = 'Could not open the private previews. Please try again.';
-			}
-		);
-		return () => { cancelled = true; };
-	});
+	let ungroupedFiles = $derived(
+		readOnly
+			? [
+					...fileList(edition.proposalModelFiles),
+					...fileList(edition.proposalModelAssets),
+					...fileList(edition.proposalModelScenes)
+				].filter((file) =>
+					models.every((model) =>
+						file !== model.file && file !== model.scene && !model.assets.includes(file)
+					)
+				)
+			: []
+	);
 
 	function readModels(value: unknown): Model[] {
 		return Array.isArray(value)
@@ -52,6 +49,13 @@
 				)
 			: [];
 	}
+	function fileList(value: unknown): string[] {
+		return Array.isArray(value)
+			? value.filter((file): file is string => typeof file === 'string' && !!file)
+			: typeof value === 'string' && value
+				? [value]
+				: [];
+	}
 	function basename(value: string) {
 		return value.slice(Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\')) + 1);
 	}
@@ -60,12 +64,16 @@
 			mainExtensions.some((extension) => file.name.toLowerCase().endsWith(extension))
 		);
 	}
-	async function showPreview() {
+	async function download(filename: string) {
+		error = '';
 		try {
-			previewToken = await pb.files.getToken();
-			error = '';
+			const token = await pb.files.getToken();
+			const anchor = document.createElement('a');
+			anchor.href = pb.files.getURL(edition, filename, { token, download: true });
+			anchor.download = basename(filename);
+			anchor.click();
 		} catch {
-			error = 'Could not open the private preview. Please try again.';
+			error = 'Could not download the file. Please try again.';
 		}
 	}
 	async function upload(event: Event) {
@@ -132,45 +140,36 @@
 </script>
 
 <div id="proposal-model-uploads" class="space-y-4">
-	<div class="grid gap-4 sm:grid-cols-2">
-	{#each models as model (model.file)}
-		<div class="ds-card-frame flex min-w-0 flex-col overflow-hidden p-3">
-			{#if previewToken}
-				<VoyagerPreview
-					edition={{
-						...edition,
-						modelFile: model.file,
-						modelAssets: model.assets,
-						sceneDocument: model.scene
-					} as RecordModel}
-					title={basename(model.file)}
-					fileToken={previewToken}
-					height="clamp(220px, 26vw, 300px)"
-				/>
-			{:else}
-				<p class="text-sm text-base-content/70" role="status">Loading model preview…</p>
-				{#if error}
-					<button type="button" class="btn btn-outline btn-sm" onclick={showPreview}>Retry preview</button>
-				{/if}
-			{/if}
-			<div class="mt-3 flex flex-1 items-start justify-between gap-2 rounded-md bg-base-200 p-3 text-sm">
-				<span
-					class="min-w-0 break-all font-semibold"
-					>{basename(model.file)}{model.assets.length
-						? ` + ${model.assets.length} companion${model.assets.length === 1 ? '' : 's'}`
-						: ''}</span
-				>{#if !readOnly}<button
-						type="button"
-						class="btn btn-square btn-ghost btn-sm shrink-0"
-						onclick={() => remove(model)}
-						aria-label={`Remove ${basename(model.file)}`}
-						title="Remove model"
-						disabled={disabled || uploading}><TrashIcon class="size-4" aria-hidden="true" /></button
-					>{/if}
-			</div>
-		</div>
-	{/each}
-	</div>
+	{#if models.length || ungroupedFiles.length}
+		<p class="text-sm text-base-content/75">
+			Download the model and its companion files to open it in a compatible 3D application.
+			You may need to restore companion filenames to match the references in the model.
+		</p>
+		<ul class="grid gap-4 sm:grid-cols-2">
+			{#each models as model (model.file)}
+				<li class="flex min-w-0 items-start justify-between gap-2 rounded-lg bg-base-200 p-3">
+					<ul class="min-w-0 space-y-2">
+						{#each [model.file, ...model.assets, ...(model.scene ? [model.scene] : [])] as filename (filename)}
+							<li>{@render downloadFile(filename)}</li>
+						{/each}
+					</ul>
+					{#if !readOnly}
+						<button
+							type="button"
+							class="btn btn-square btn-ghost btn-sm shrink-0"
+							onclick={() => remove(model)}
+							aria-label={`Remove ${basename(model.file)}`}
+							title="Remove model"
+							disabled={disabled || uploading}
+						><TrashIcon class="size-4" aria-hidden="true" /></button>
+					{/if}
+				</li>
+			{/each}
+			{#each ungroupedFiles as filename (filename)}
+				<li class="min-w-0 rounded-lg bg-base-200 p-3">{@render downloadFile(filename)}</li>
+			{/each}
+		</ul>
+	{/if}
 	{#if !readOnly}
 		<div
 			class="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-4 text-center"
@@ -201,5 +200,13 @@
 			>
 		</div>
 	{/if}
-	{#if error}<p class="text-sm text-error">{error}</p>{/if}
+	{#if error}<p class="text-sm text-error" role="alert">{error}</p>{/if}
 </div>
+
+{#snippet downloadFile(filename: string)}
+	<button
+		type="button"
+		class="link link-primary text-left text-sm break-all"
+		onclick={() => download(filename)}
+	>Download {basename(filename)}</button>
+{/snippet}

@@ -2,6 +2,7 @@ const proposalFields = [
 	'proposalOpenCall',
 	'proposalType',
 	'proposalPurpose',
+	'proposalModelReferences',
 	'proposalArgument',
 	'proposalThreeDRationale',
 	'proposalAudience',
@@ -20,7 +21,7 @@ const proposalFields = [
 	'proposalSnapshot',
 	'proposalSubmittedAt'
 ];
-const proposalTypes = ['research', 'teaching', 'public-engagement', 'other'];
+const questionnaireWordLimit = 300;
 const audiences = [
 	'general-public',
 	'academics',
@@ -129,20 +130,21 @@ function openCallSnapshot(app, record) {
 	return { id, title: text(call, 'title'), deadline: text(call, 'deadline') };
 }
 function submissionErrors(record, app) {
-	if (!proposalTypes.includes(text(record, 'proposalType'))) return ['Select a proposal type.'];
 	if (!text(record, 'title').trim()) return ['Title is required.'];
 	const credits = json(record, 'credits');
 	if (!Array.isArray(credits) || !credits.some((credit) => credit && credit.role === 'creator'))
 		return ['Add at least one author.'];
 	for (const [field, label] of [
 		['proposalPurpose', 'Purpose'],
-		['proposalArgument', 'Research argument and model centrality'],
+		['proposalModelReferences', 'Model links and published materials'],
+		['proposalArgument', 'Narrative or story'],
 		['proposalThreeDRationale', 'Why 3D is appropriate'],
 		['proposalContextualMaterial', 'Contextual material description']
 	]) {
 		const value = text(record, field).trim();
-		if (!value) return [label + ' is required.'];
-		if (words(value) > 150) return [label + ' must be 150 words or fewer.'];
+		if (field !== 'proposalModelReferences' && !value) return [label + ' is required.'];
+		if (words(value) > questionnaireWordLimit)
+			return [`${label} must be ${questionnaireWordLimit} words or fewer.`];
 	}
 	const selectedAudiences = list(record, 'proposalAudience');
 	if (!selectedAudiences.length || selectedAudiences.some((value) => !audiences.includes(value)))
@@ -156,8 +158,8 @@ function submissionErrors(record, app) {
 		)
 			return ['Select at least one model source.'];
 		const ownership = text(record, 'proposalCopyrightOwnership').trim();
-		if (!ownership) return ['Explain copyright ownership and permissions.'];
-		if (words(ownership) > 150) return ['Copyright ownership must be 150 words or fewer.'];
+		if (!ownership) return ['Explain rights and permissions.'];
+		if (words(ownership) > 150) return ['Rights and permissions must be 150 words or fewer.'];
 	} else {
 		const situation = text(record, 'proposalDigitisationSituation').trim();
 		if (!situation) return ['Describe the digitisation situation.'];

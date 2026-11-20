@@ -29,8 +29,9 @@
 <div id="credits-editor" class="space-y-3">
 	{#if !authorsOnly}<h3 class="font-semibold">Creators and contributors</h3>{/if}
 	<p class="text-sm text-base-content/70">
-		{#if authorsOnly}Each individual author needs an ORCID before submission. Adding a co-author
-			credits them; it does not grant editing access.
+		{#if authorsOnly}To add co-authors, please add them with their name and ORCID ID. Adding an
+			author at this stage of the process will give them credit. Editing rights for co-authors
+			are done at a later stage.
 		{:else}Every individual creator needs an ORCID to submit or publish. Organisations do not.
 			Contributors are optional. Linking a user does not grant access.{/if}
 	</p>

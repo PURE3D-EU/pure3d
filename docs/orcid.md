@@ -77,6 +77,11 @@ author supplies or confirms an identifier. Authors are person credits with `role
 their ORCIDs are mandatory. Contributor ORCIDs are optional. The migration, frontend and backend
 block submission/publication when a person creator lacks ORCID or there are no creators.
 
+Adding a co-author's name and ORCID to a proposal gives them credit, not access. Neither proposal
+approval nor signing in with that ORCID grants editing rights automatically. After approval, the
+submitting author can use the **Team** tab on the edition's Workflow page to add the co-author's account as a
+collaborator once they have signed in.
+
 The canonical ordered JSON field on both `collections` and `editions` is `credits`:
 
 ```ts

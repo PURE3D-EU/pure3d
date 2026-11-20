@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { PROPOSAL_AUDIENCES, wordCount } from '$lib/workflow/proposal';
+	import { PROPOSAL_AUDIENCES, QUESTIONNAIRE_WORD_LIMIT, wordCount } from '$lib/workflow/proposal';
 	let {
 		purpose = $bindable(''),
+		modelReferences = $bindable(''),
 		argument = $bindable(''),
 		rationale = $bindable(''),
 		context = $bindable(''),
@@ -11,15 +12,22 @@
 	const questions = $derived([
 		{
 			id: 'proposal-purpose',
-			label: 'For what purpose was the model created?',
-			hint: 'Please provide links to existing websites, research publications, videos, or graphics.',
+			label: 'Tell us for what purpose your 3D model was created.',
+			hint: '',
 			value: purpose,
 			change: (value: string) => (purpose = value)
 		},
 		{
+			id: 'proposal-model-references',
+			label: 'Model links and published materials (optional)',
+			hint: 'If your model is publicly available, please provide a link. If there are published materials, such as popular or academic articles, blog posts, videos, etc., about the models and its creation, please include links and brief descriptions below.',
+			value: modelReferences,
+			change: (value: string) => (modelReferences = value),
+			optional: true
+		},
+		{
 			id: 'proposal-argument',
-			label:
-				'What research argument or narrative would you like to develop, and how will the 3D model be its central component?',
+			label: 'What is the narrative or story about the 3D model you would like to tell?',
 			hint: '',
 			value: argument,
 			change: (value: string) => (argument = value)
@@ -34,8 +42,8 @@
 		},
 		{
 			id: 'proposal-context',
-			label: 'What material do you have available to contextualise your 3D models?',
-			hint: 'Indicate formats and quantities, including archival material, images, videos, or audio recordings.',
+			label: 'What material do you intend to use to contextualise your 3D model(s)?',
+			hint: 'Please provide any information you currently have, including previously written material, bibliographic references, archival sources, images, videos, audio recordings, etc. This is material that will both inform your narrative and multimedia that will enrich the experience and narrative flow of your 3D edition. Links are not necessary at this time.',
 			value: context,
 			change: (value: string) => (context = value)
 		}
@@ -56,7 +64,9 @@
 			{:else}
 				<label class="label-text font-semibold" for={field.id}>{field.label}</label>
 			{/if}
-			{#if field.hint}<span class="mt-1 text-sm text-base-content/75">{field.hint}</span>{/if}
+			{#if field.hint}<span id={`${field.id}-hint`} class="mt-1 text-sm text-base-content/75"
+					>{field.hint}</span
+				>{/if}
 			{#if readOnly}
 				<p class="mt-2 min-h-12 rounded-lg bg-base-200/50 p-3 text-sm whitespace-pre-wrap">
 					{field.value || 'Not provided'}
@@ -67,16 +77,19 @@
 					class="textarea-bordered textarea mt-2 min-h-20 w-full"
 					rows="3"
 					value={field.value}
-					aria-invalid={wordCount(field.value) > 150}
+					aria-invalid={wordCount(field.value) > QUESTIONNAIRE_WORD_LIMIT}
+					aria-describedby={field.hint
+						? `${field.id}-hint ${field.id}-count`
+						: `${field.id}-count`}
 					oninput={(event) => {
 						field.change(event.currentTarget.value);
 						event.currentTarget.style.height = 'auto';
 						event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
 					}}
-					required
+					required={!field.optional}
 				></textarea>
-				<span class="mt-1 text-right text-xs text-base-content/75"
-					>{wordCount(field.value)}/150 words</span
+				<span id={`${field.id}-count`} class="mt-1 text-right text-xs text-base-content/75"
+					>{wordCount(field.value)}/{QUESTIONNAIRE_WORD_LIMIT} words</span
 				>
 			{/if}
 		</div>

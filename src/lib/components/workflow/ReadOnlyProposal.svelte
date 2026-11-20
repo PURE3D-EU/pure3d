@@ -6,7 +6,8 @@
 	import {
 		formatOpenCallDeadline,
 		MODEL_SOURCES,
-		PROPOSAL_TYPES,
+		MODEL_RIGHTS_QUESTION,
+		OBJECT_LINKS_LABEL,
 		isProposalLink
 	} from '$lib/workflow/proposal';
 	import toast from 'svelte-french-toast';
@@ -51,22 +52,14 @@
 		<div class="-mx-5 -mt-5 border-b border-base-300 bg-base-200 px-5 py-3">
 			<h2 class="text-base font-semibold">Submitted proposal</h2>
 		</div>
-		<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-			<div>
-				<h3 class="text-sm font-semibold">Proposal type</h3>
-				<p class="mt-1 rounded-lg bg-base-200/50 p-3 text-sm">
-					{PROPOSAL_TYPES.find(([id]) => id === record.proposalType)?.[1] || 'Not provided'}
-				</p>
-			</div>
-			<div>
-				<h3 class="text-sm font-semibold">Title</h3>
-				<p class="mt-1 rounded-lg bg-base-200/50 p-3 text-sm">
-					{record.title || 'Untitled edition'}
-				</p>
-			</div>
+		<div>
+			<h3 class="text-sm font-semibold">Title</h3>
+			<p class="mt-1 rounded-lg bg-base-200/50 p-3 text-sm">
+				{record.title || 'Untitled edition'}
+			</p>
 		</div>
 		<div>
-			<h3 class="text-sm font-semibold">Thematic call</h3>
+			<h3 class="text-sm font-semibold">Proposal Type</h3>
 			<p class="mt-1 rounded-lg bg-base-200/50 p-3 text-sm">
 				{#if openCall}
 					{openCall.title}{openCall.deadline
@@ -92,6 +85,7 @@
 
 	<ProposalQuestionnaire
 		purpose={record.proposalPurpose || ''}
+		modelReferences={record.proposalModelReferences || ''}
 		argument={record.proposalArgument || ''}
 		rationale={record.proposalThreeDRationale || ''}
 		context={record.proposalContextualMaterial || ''}
@@ -126,7 +120,7 @@
 			{/if}
 			<div>
 				<h3 class="text-sm font-semibold">
-					Do you own the copyright of the model(s)? If not, please explain.
+					{MODEL_RIGHTS_QUESTION}
 				</h3>
 				<p class="mt-2 min-h-12 rounded-lg bg-base-200/50 p-3 text-sm whitespace-pre-wrap">
 					{record.proposalCopyrightOwnership || 'Not provided'}
@@ -140,7 +134,7 @@
 				</p>
 			</div>
 			<div>
-				<h3 class="text-sm font-semibold">Supporting links</h3>
+				<h3 class="text-sm font-semibold">{OBJECT_LINKS_LABEL}</h3>
 				<ul class="mt-2 space-y-1 rounded-lg bg-base-200/50 p-3 text-sm">
 					{#each supportingLinks(record.proposalSupportingLinks) as link, index (index)}
 						<li class="break-all">

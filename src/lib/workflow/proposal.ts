@@ -1,9 +1,7 @@
-export const PROPOSAL_TYPES = [
-	['research', 'Research'],
-	['teaching', 'Teaching'],
-	['public-engagement', 'Public engagement'],
-	['other', 'Other']
-] as const;
+export const QUESTIONNAIRE_WORD_LIMIT = 300;
+export const MODEL_RIGHTS_QUESTION =
+	'Do you have the necessary rights or permissions to include, reproduce, adapt, and publish the 3D model(s) and all other multimedia materials intended for the 3D edition? If not, please explain.';
+export const OBJECT_LINKS_LABEL = 'Links to the object you want to use for your 3D Edition';
 
 export const PROPOSAL_AUDIENCES = [
 	['general-public', 'General public'],
@@ -28,10 +26,10 @@ export const MODEL_SOURCES = [
 
 export type ProposalData = {
 	proposalOpenCall: string;
-	proposalType: string;
 	title: string;
 	credits: Array<{ role?: string }>;
 	purpose: string;
+	modelReferences: string;
 	argument: string;
 	threeDRationale: string;
 	audiences: string[];
@@ -63,12 +61,16 @@ export function formatOpenCallDeadline(deadline: string): string {
 
 const writtenFields: Array<
 	[
-		keyof Pick<ProposalData, 'purpose' | 'argument' | 'threeDRationale' | 'contextualMaterial'>,
+		keyof Pick<
+			ProposalData,
+			'purpose' | 'modelReferences' | 'argument' | 'threeDRationale' | 'contextualMaterial'
+		>,
 		string
 	]
 > = [
 	['purpose', 'Purpose'],
-	['argument', 'Research argument and model centrality'],
+	['modelReferences', 'Model links and published materials'],
+	['argument', 'Narrative or story'],
 	['threeDRationale', 'Why 3D is appropriate'],
 	['contextualMaterial', 'Contextual material description']
 ];
@@ -78,23 +80,22 @@ export function wordCount(value: string): number {
 }
 
 export function proposalErrors(proposal: ProposalData): string[] {
-	if (!PROPOSAL_TYPES.some(([value]) => value === proposal.proposalType))
-		return ['Select a proposal type.'];
 	if (!proposal.title.trim()) return ['Title is required.'];
 	if (!proposal.credits.some((credit) => credit.role === 'creator'))
 		return ['Add at least one author.'];
 	for (const [field, label] of writtenFields) {
-		if (!proposal[field].trim()) return [`${label} is required.`];
-		if (wordCount(proposal[field]) > 150) return [`${label} must be 150 words or fewer.`];
+		if (field !== 'modelReferences' && !proposal[field].trim()) return [`${label} is required.`];
+		if (wordCount(proposal[field]) > QUESTIONNAIRE_WORD_LIMIT)
+			return [`${label} must be ${QUESTIONNAIRE_WORD_LIMIT} words or fewer.`];
 	}
 	if (proposal.audiences.length === 0) return ['Select at least one intended audience.'];
 	if (proposal.hasExistingModel) {
 		if (!proposal.hasModelFile) return ['Upload an existing 3D model before submitting.'];
 		if (proposal.modelSources.length === 0) return ['Select at least one model source.'];
 		if (!proposal.copyrightOwnership.trim())
-			return ['Explain copyright ownership and permissions.'];
+			return ['Explain rights and permissions.'];
 		if (wordCount(proposal.copyrightOwnership) > 150)
-			return ['Copyright ownership must be 150 words or fewer.'];
+			return ['Rights and permissions must be 150 words or fewer.'];
 	} else {
 		if (!proposal.digitisationSituation.trim()) return ['Describe the digitisation situation.'];
 		if (wordCount(proposal.digitisationSituation) > 150)

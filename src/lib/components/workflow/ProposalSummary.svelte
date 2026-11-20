@@ -5,19 +5,19 @@
 		formatOpenCallDeadline,
 		MODEL_SOURCES,
 		PROPOSAL_AUDIENCES,
-		PROPOSAL_TYPES,
+		OBJECT_LINKS_LABEL,
 		isProposalLink
 	} from '$lib/workflow/proposal';
 	import ProposalModelUploads from '$lib/components/uploads/ProposalModelUploads.svelte';
 	import toast from 'svelte-french-toast';
 	let { record, embedded = false }: { record: RecordModel; embedded?: boolean } = $props();
 	const questions = [
-		['proposalPurpose', 'For what purpose was the model created?'],
-		['proposalArgument', 'Research argument or narrative and the role of the 3D model'],
-		['proposalThreeDRationale', 'Why is 3D visualisation appropriate?'],
+		['proposalPurpose', 'Purpose'],
+		['proposalModelReferences', 'Model links and published materials'],
+		['proposalArgument', 'Narrative or story'],
+		['proposalThreeDRationale', 'Why 3D'],
 		['proposalContextualMaterial', 'Contextual material']
 	];
-	const compactLabels = ['Purpose', 'Research argument', 'Why 3D', 'Context'];
 	let openCall = $derived.by(() => {
 		const value = record.proposalSnapshot?.openCall;
 		return value && typeof value.id === 'string' && typeof value.title === 'string' ? value : null;
@@ -47,11 +47,7 @@
 	{#if !embedded}<h2 class="text-xl font-semibold">Submitted proposal</h2>{/if}
 	<dl class="compact-summary text-sm">
 		<div class={embedded ? 'grid grid-cols-[5rem_1fr] gap-2' : ''}>
-			<dt class="font-semibold">Type</dt>
-			<dd>{PROPOSAL_TYPES.find(([id]) => id === record.proposalType)?.[1] || 'Not provided'}</dd>
-		</div>
-		<div class={embedded ? 'grid grid-cols-[5rem_1fr] gap-2' : ''}>
-			<dt class="font-semibold">Call</dt>
+			<dt class="font-semibold">Proposal Type</dt>
 			<dd>
 				{#if openCall}
 					{openCall.title}{openCall.deadline
@@ -76,9 +72,9 @@
 				<dd>{labels(record.proposalAudience, PROPOSAL_AUDIENCES)}</dd>
 			</div>
 		{/if}
-		{#each questions as [field], index (field)}
+		{#each questions as [field, label] (field)}
 			<div>
-				<dt class="font-semibold">{compactLabels[index]}</dt>
+				<dt class="font-semibold">{label}</dt>
 				<dd class="mt-1 break-words whitespace-pre-wrap">{record[field] || 'Not provided'}</dd>
 			</div>
 		{/each}
@@ -102,7 +98,7 @@
 				<dd>{labels(record.proposalModelSources, MODEL_SOURCES)}</dd>
 			</div>
 			<div>
-				<dt class="font-semibold">Copyright ownership and permissions</dt>
+				<dt class="font-semibold">Rights and permissions</dt>
 				<dd class="whitespace-pre-wrap">{record.proposalCopyrightOwnership}</dd>
 			</div>
 		{:else}
@@ -113,7 +109,7 @@
 		{/if}
 		{#if Array.isArray(record.proposalSupportingLinks) && record.proposalSupportingLinks.length}
 			<div>
-				<dt class="font-semibold">Supporting links</dt>
+				<dt class="font-semibold">{OBJECT_LINKS_LABEL}</dt>
 				<dd>
 					<ul>
 						{#each record.proposalSupportingLinks as link, index (index)}<li class="break-all">

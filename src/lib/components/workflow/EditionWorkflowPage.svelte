@@ -47,7 +47,8 @@
 	import {
 		formatOpenCallDeadline,
 		MODEL_SOURCES,
-		PROPOSAL_TYPES,
+		MODEL_RIGHTS_QUESTION,
+		OBJECT_LINKS_LABEL,
 		proposalErrors,
 		type ProposalOpenCallSnapshot,
 		wordCount
@@ -128,11 +129,11 @@
 	let conceptDcDatePublished = $state('');
 	let conceptDcProvenance = $state('');
 	let metadataVocabulary = $state<Array<{ category?: string; name?: string; value?: string }>>([]);
-	let proposalType = $state('');
 	let proposalOpenCall = $state('');
 	let proposalOpenCalls = $state<ProposalOpenCallSnapshot[]>([]);
 	let proposalOpenCallSnapshot = $state<ProposalOpenCallSnapshot | null>(null);
 	let proposalPurpose = $state('');
+	let proposalModelReferences = $state('');
 	let proposalArgument = $state('');
 	let proposalThreeDRationale = $state('');
 	let proposalAudience = $state<string[]>([]);
@@ -469,10 +470,10 @@
 			conceptDcContact = edRecord.dcContact || '';
 			conceptDcDatePublished = edRecord.dcDatePublished || '';
 			conceptDcProvenance = edRecord.dcProvenance || '';
-			proposalType = edRecord.proposalType || '';
 			proposalOpenCall = edRecord.proposalOpenCall || '';
 			proposalOpenCallSnapshot = openCallSnapshot(edRecord.proposalSnapshot);
 			proposalPurpose = edRecord.proposalPurpose || '';
+			proposalModelReferences = edRecord.proposalModelReferences || '';
 			proposalArgument = edRecord.proposalArgument || '';
 			proposalThreeDRationale = edRecord.proposalThreeDRationale || '';
 			proposalAudience = Array.isArray(edRecord.proposalAudience) ? edRecord.proposalAudience : [];
@@ -684,8 +685,8 @@
 			dcTitle: conceptTitle.trim(),
 			credits: readCredits(credits),
 			proposalOpenCall,
-			proposalType,
 			proposalPurpose: proposalPurpose.trim(),
+			proposalModelReferences: proposalModelReferences.trim(),
 			proposalArgument: proposalArgument.trim(),
 			proposalThreeDRationale: proposalThreeDRationale.trim(),
 			proposalAudience,
@@ -743,7 +744,7 @@
 				const updated = await pb
 					.collection('editions')
 					.update(editionId, data, { requestKey: null });
-				if (isProposal && !('proposalType' in updated))
+				if (isProposal && !('proposalModelReferences' in updated))
 					throw new Error('The proposal database migration must be installed before saving.');
 				if (workflowDisposed || draft !== controller || edition?.id !== editionId) return;
 				editionRecord = updated;
@@ -908,10 +909,10 @@
 		}
 		const errors = proposalErrors({
 			proposalOpenCall,
-			proposalType,
 			title: conceptTitle,
 			credits,
 			purpose: proposalPurpose,
+			modelReferences: proposalModelReferences,
 			argument: proposalArgument,
 			threeDRationale: proposalThreeDRationale,
 			audiences: proposalAudience,
@@ -1223,23 +1224,12 @@
 							<p class="text-sm text-base-content/65">
 								Your proposal stays private and editable until you submit it for editorial review.
 							</p>
-							<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-								<label class="form-control">
-									<span class="label-text mb-1 font-semibold">Proposal type</span>
-									<select class="select-bordered select w-full" bind:value={proposalType} required>
-										<option value="" disabled>Select a type</option>
-										{#each PROPOSAL_TYPES as [value, label] (value)}
-											<option {value}>{label}</option>
-										{/each}
-									</select>
-								</label>
-								<label class="form-control">
-									<span class="label-text mb-1 font-semibold">Title</span>
-									<input class="input-bordered input w-full" bind:value={conceptTitle} required />
-								</label>
-							</div>
 							<label class="form-control">
-								<span class="label-text mb-1 font-semibold">Thematic call</span>
+								<span class="label-text mb-1 font-semibold">Title</span>
+								<input class="input-bordered input w-full" bind:value={conceptTitle} required />
+							</label>
+							<label class="form-control">
+								<span class="label-text mb-1 font-semibold">Proposal Type</span>
 								<select class="select-bordered select w-full" bind:value={proposalOpenCall}>
 									<option value="">General submission</option>
 									{#if proposalOpenCall && !proposalOpenCalls.some((call) => call.id === proposalOpenCall)}
@@ -1257,8 +1247,8 @@
 									{/each}
 								</select>
 								<span class="label-text-alt mt-1 text-base-content/60"
-									>Select a published thematic call, or leave this as General submission. Deadlines
-									include the stated UTC calendar day.</span
+									>Select a published thematic call, or submit your edition proposal as ‘General
+									submission’. Deadlines for thematic calls are midnight UTC of the submission date.</span
 								>
 							</label>
 							<div>
@@ -1276,6 +1266,7 @@
 
 						<ProposalQuestionnaire
 							bind:purpose={proposalPurpose}
+							bind:modelReferences={proposalModelReferences}
 							bind:argument={proposalArgument}
 							bind:rationale={proposalThreeDRationale}
 							bind:context={proposalContextualMaterial}
@@ -1317,12 +1308,15 @@
 										<p>
 											Please check the technical requirements in the <a
 												href={resolve('/documentation/[slug]', { slug: 'submission' })}
+												target="_blank"
+												rel="noopener"
 												class="link link-primary">submission guidelines</a
 											>.
 										</p>
 										<p>
 											At this stage, the model is used to assess compatibility and suitability for a
-											3D edition. You can adjust the resolution before publication.
+											3D edition. You can optimise, adjust or change the 3D model during the
+											authoring process of your edition.
 										</p>
 									</div>
 									<fieldset
@@ -1354,8 +1348,8 @@
 									<div class="space-y-2">
 										<h3 class="text-sm font-semibold">Model files</h3>
 										<p class="text-xs text-base-content/80">
-											Add one GLB, GLTF, OBJ, or PLY model with its companion files at a time.
-											Maximum 200 MB per file. Each model is previewed automatically.
+											Add one GLB, GLTF, OBJ, or PLY model at a time. Select or drop the primary model
+											and its companion files together, without zipping them. Maximum 200 MB per file.
 										</p>
 										{#if editionRecord}
 											<ProposalModelUploads
@@ -1370,9 +1364,7 @@
 										{/if}
 									</div>
 									<label class="form-control">
-										<span class="text-sm font-semibold"
-											>Do you own the copyright of the model(s)? If not, please explain.</span
-										>
+										<span class="text-sm font-semibold">{MODEL_RIGHTS_QUESTION}</span>
 										<textarea
 											class="textarea-bordered textarea mt-2 min-h-20 w-full"
 											rows="3"
@@ -1407,12 +1399,12 @@
 										>{wordCount(proposalDigitisationSituation)}/150 words</span
 									>
 								</label>
-								<p class="text-xs leading-relaxed text-base-content/80">
-									Add images, videos or website links to help us assess whether your subject is
-									suitable for a 3D scholarly edition.
-								</p>
 								<label class="form-control">
-									<span class="text-sm font-semibold">Supporting links</span>
+									<span class="text-sm font-semibold">{OBJECT_LINKS_LABEL}</span>
+									<span class="mt-1 text-xs leading-relaxed text-base-content/80">
+										Add links to images, videos or websites to help us assess whether your object is
+										suitable for a 3D scholarly edition.
+									</span>
 									<textarea
 										class="textarea-bordered textarea mt-1 min-h-20 w-full"
 										bind:value={proposalSupportingLinks}

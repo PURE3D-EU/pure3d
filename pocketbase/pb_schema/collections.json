@@ -565,6 +565,7 @@
 				"values": ["research", "teaching", "public-engagement", "other"]
 			},
 			{ "name": "proposalPurpose", "type": "text", "required": false, "max": 10000 },
+			{ "name": "proposalModelReferences", "type": "text", "required": false, "max": 10000 },
 			{ "name": "proposalArgument", "type": "text", "required": false, "max": 10000 },
 			{ "name": "proposalThreeDRationale", "type": "text", "required": false, "max": 10000 },
 			{ "name": "proposalAudience", "type": "json", "required": false, "maxSize": 262144 },

@@ -9,6 +9,13 @@ applies because this is a private-package static web app.
 
 ## Automatic release and local fallback
 
+For the milestone 9 proposal changes, deploy the updated PocketBase `proposal-service.cjs` before
+adding the optional `editions.proposalModelReferences` text field from `pocketbase/pb_schema/collections.json`.
+The hook protects the new field and updates proposal validation. Back up and verify the schema
+change before publishing the frontend, which expects the new field when saving a proposal. Keep the
+legacy `proposalType` field and its data; the form no longer uses it. The unpublish action (#78)
+separately requires the route in `orcid.pb.js` and the handler in `admin-workflow-service.cjs`.
+
 Main-push releases always run with `--patch`: maintenance commits receive a patch release, while
 `feat` and breaking commits still take precedence and produce minor and major releases. Release
 runs are serialized and are never cancelled. The job checks out the current `main`, fetches again
