@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.8.1 - 2026-11-20
+
+### Fixes
+
+- complete milestone 9 form updates (6c99bc16)
+
 ## v2.8.0 - 2026-11-19
 
 ### Features
