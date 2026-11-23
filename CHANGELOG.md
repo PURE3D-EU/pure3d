@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.9.0 - 2026-11-23
+
+### Features
+
+- add audited edition republication (e1ab23eb)
+
 ## v2.8.1 - 2026-11-20
 
 ### Fixes
