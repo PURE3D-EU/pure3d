@@ -67,7 +67,7 @@ export const homeStore = persisted<{
 	editionTotal: number;
 	collectionTotal: number;
 	lastFetched: number | null;
-}>(`${cachePrefix}:home:v1`, {
+}>(`${cachePrefix}:home:v2`, {
 	editions: [],
 	collections: [],
 	editionTotal: 0,
@@ -75,8 +75,11 @@ export const homeStore = persisted<{
 	lastFetched: null
 });
 
+const amateurHomeCinemaId = 'e6581833c2f4398';
+const bornDigitalArchivesId = 'rvzdwcc94e1m0p2';
+
 export async function fetchHomeData() {
-	const [editions, collections] = await Promise.all([
+	const [editions, collections, featured] = await Promise.all([
 		pb.collection('editions').getList(1, 8, {
 			filter: 'isPublished = true',
 			fields: HOME_EDITION_FIELDS,
@@ -85,8 +88,19 @@ export async function fetchHomeData() {
 		pb.collection('collections').getList(1, 5, {
 			filter: 'isVisible = true',
 			fields: HOME_COLLECTION_FIELDS
+		}),
+		pb.collection('collections').getList(1, 1, {
+			filter: pb.filter('isVisible = true && id = {:id}', { id: amateurHomeCinemaId }),
+			fields: HOME_COLLECTION_FIELDS,
+			skipTotal: true
 		})
 	]);
+	const featuredCollections = [
+		...featured.items,
+		...collections.items.filter(
+			({ id }) => id !== bornDigitalArchivesId && id !== amateurHomeCinemaId
+		)
+	].slice(0, 4);
 	const value = {
 		editions: editions.items.map((record) => {
 			const collectionPubNum = record.expand?.collection?.pubNum || 0;
@@ -115,7 +129,7 @@ export async function fetchHomeData() {
 				isPublished: true
 			} as Edition;
 		}),
-		collections: collections.items.map((record) => ({
+		collections: featuredCollections.map((record) => ({
 			id: record.id,
 			slug: record.id,
 			title: record.title,

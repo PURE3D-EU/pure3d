@@ -82,3 +82,8 @@
 - 2026-11-20 · OpenCode · Pushed `6c99bc1` to `main`; release run `44759273028` is in progress. After Pages confirms the deployed commit, assign and comment on #78 and #118–123 for Kelly.
 - 2026-11-20 · OpenCode · Verified CI and Pages deployment of v2.8.1 from `6c99bc1`. Assigned #78 and #118–123 to Kelly, verified one fix comment on each, and left all seven open for review.
 - 2026-11-23 · OpenCode · Added audited admin republication on the edition Workflow page for #78, including editions already withdrawn and moved to Final Review. Svelte compilation and hook syntax checks passed; no application tests, deployment, or production record changes.
+- 2026-11-23 · OpenCode · Tagged Kelly in a verified #78 comment from ctwhome, explaining the new workflow and that the frontend release was in progress and the PocketBase endpoint was not yet live.
+- 2026-11-23 · OpenCode · Deployed the three scoped #78 PocketBase hook changes after a full hook backup. Verified health, authenticated eligibility for Maastricht 333 CE and unauthenticated route rejection. No schema or edition record changed; frontend release 45179999053 was still running.
+- 2026-11-23 · OpenCode · Captured #78 action and confirmation screenshots using the change markup and PURE3D styles with sample data; no live admin session or edition changes.
+- 2026-11-23 · OpenCode · Checked #107 against the live homepage feed: Born-digital Archives is still in the first four collections; Amateur Home Cinema is public but not featured. No changes made.
+- 2026-11-23 · OpenCode · Updated #107’s homepage feed to feature public Amateur Home Cinema instead of Born-digital Archives, without changing catalogue records or totals. Confirmed the live API returns the replacement; not deployed.
