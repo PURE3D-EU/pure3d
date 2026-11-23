@@ -15,6 +15,12 @@ const transitions = {
 	publication_requested: ['final_accepted', 'final_review']
 };
 const overrideContext = 'pure3d.adminWorkflowOverride';
+const republishStatuses = [
+	'final_revisions',
+	'final_review',
+	'final_accepted',
+	'publication_requested'
+];
 
 function words(value) {
 	return String(value || '')
@@ -157,6 +163,83 @@ function unpublish(e) {
 	return e.json(200, result);
 }
 
+function canRepublish(app, edition) {
+	if (
+		edition.getBool('isSandbox') ||
+		edition.getBool('isPublished') ||
+		!republishStatuses.includes(edition.getString('status'))
+	)
+		return false;
+	const [event] = app.findRecordsByFilter(
+		'auditLog',
+		'targetType = "edition" && targetId = {:id} && (action = "edition_unpublished" || action = "edition_republished" || (action = "status_transition" && details.after.status = "published"))',
+		'-created,-id',
+		1,
+		0,
+		{ id: edition.id }
+	);
+	// Historical metadata is editable; only a server-written unpublish event grants eligibility.
+	return !!event && event.getString('action') === 'edition_unpublished';
+}
+
+function republishEligibility(e) {
+	if (!require('./orcid-service.cjs').admin(e))
+		throw new ForbiddenError('Administrator access is required.');
+	const edition = e.app.findRecordById('editions', e.request.pathValue('editionId'));
+	e.response.header().set('Cache-Control', 'no-store');
+	return e.json(200, { eligible: canRepublish(e.app, edition) });
+}
+
+function republish(e) {
+	if (!require('./orcid-service.cjs').admin(e))
+		throw new ForbiddenError('Administrator access is required.');
+	const id = e.request.pathValue('editionId');
+	const body = e.requestInfo().body || {};
+	const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+	if (!reason || reason.length > 5000 || words(reason) > 500)
+		throw new BadRequestError(
+			'Provide a republication reason of no more than 500 words or 5,000 characters.'
+		);
+	if (body.rightsConfirmed !== true)
+		throw new BadRequestError('Confirm that you have permission to publish the revised edition.');
+
+	e.app.runInTransaction((tx) => {
+		const edition = tx.findRecordById('editions', id);
+		const from = edition.getString('status');
+		if (from !== body.expectedStatus || edition.getString('updated') !== body.expectedUpdated)
+			throw new BadRequestError('The edition changed. Reload and review it before republishing.');
+		if (!canRepublish(tx, edition))
+			throw new BadRequestError(
+				'Only previously published editions withdrawn by an administrator can be republished here.'
+			);
+		const metadataError = require('./publication-service.cjs').metadataError(edition);
+		if (metadataError) throw new BadRequestError(metadataError);
+
+		const activity = require('./activity-service.cjs');
+		const actor = activity.actor(e.auth);
+		edition.set('status', 'published');
+		edition.set('isPublished', true);
+		edition.set('reviewStage', 3);
+		edition.set('publishedAt', new Date().toISOString());
+		edition.set('publishedBy', e.auth.isSuperuser() ? '' : e.auth.id);
+		edition.set('dcDateUnPublished', '');
+		edition.set('peerReviewStamp', false);
+		edition.set('peerReviewKind', 'No peer review');
+		edition.set('publicationRequest', '');
+		edition.set('publicationSubmittedAt', '');
+		edition.set('workflowDecision', '');
+		// Run the normal publication-time credit checks, without an administrative exemption.
+		tx.saveWithContext(new Context(null, 'pure3d.actor', actor), edition);
+		activity.audit(tx, actor, 'edition_republished', 'edition', id, {
+			from,
+			to: 'published',
+			reason,
+			rightsConfirmed: true
+		});
+	});
+	return e.json(200, { status: 'published' });
+}
+
 module.exports = {
 	transitions,
 	error,
@@ -164,5 +247,7 @@ module.exports = {
 	reviewStage,
 	override,
 	unpublish,
+	republishEligibility,
+	republish,
 	overrideContext
 };

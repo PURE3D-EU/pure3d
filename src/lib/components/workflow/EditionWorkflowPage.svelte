@@ -102,6 +102,12 @@
 	let isDeleting = $state(false);
 	let unpublishDialog: HTMLDialogElement;
 	let unpublishReason = $state('');
+	let republishDialog: HTMLDialogElement;
+	let canRepublish = $state(false);
+	let republishEligibilityError = $state(false);
+	let republishReason = $state('');
+	let republishRightsConfirmed = $state(false);
+	let republishError = $state('');
 
 	// Concept form state
 	let conceptTitle = $state('');
@@ -419,6 +425,8 @@
 		draft = null;
 		let loaded = false;
 		isLoading = true;
+		canRepublish = false;
+		republishEligibilityError = false;
 		alphaContextSaveStatus = 'saved';
 		formReady = false;
 		const slug = $page.params.slug || '';
@@ -442,6 +450,26 @@
 				created: edRecord.created,
 				proposalSubmittedAt: edRecord.proposalSubmittedAt || ''
 			};
+			if (
+				isAdmin &&
+				!isSandbox &&
+				[
+					EditionStatus.FinalRevisions,
+					EditionStatus.FinalReview,
+					EditionStatus.FinalAccepted,
+					EditionStatus.PublicationRequested
+				].includes(edition.status)
+			) {
+				try {
+					const { eligible } = await pb.send<{ eligible: boolean }>(
+						`/api/pure3d/editions/${edRecord.id}/republish`,
+						{ method: 'GET' }
+					);
+					canRepublish = eligible;
+				} catch {
+					republishEligibilityError = true;
+				}
+			}
 
 			// Initialize concept form
 			if ($page.url.hash === '#edition-review-tab')
@@ -1001,6 +1029,55 @@
 		}
 	}
 
+	function openRepublishDialog() {
+		republishReason = '';
+		republishRightsConfirmed = false;
+		republishError = '';
+		republishDialog.showModal();
+	}
+
+	async function republishEdition() {
+		if (
+			!edition ||
+			!isAdmin ||
+			!canRepublish ||
+			isSubmitting ||
+			isSaving ||
+			editionAssetsBusy ||
+			coverBusy ||
+			!republishReason.trim() ||
+			!republishRightsConfirmed
+		)
+			return;
+		isSubmitting = true;
+		republishError = '';
+		try {
+			if (viewMode === 'concept-form') {
+				flushingForReview = true;
+				if (!(await persistDraft({ showToast: false })))
+					throw new Error(saveError || 'Save the latest changes before republishing.');
+			}
+			if (!editionRecord || workflowDisposed) return;
+			await pb.send(`/api/pure3d/editions/${edition.id}/republish`, {
+				method: 'POST',
+				body: {
+					expectedStatus: edition.status,
+					expectedUpdated: editionRecord.updated,
+					reason: republishReason.trim(),
+					rightsConfirmed: republishRightsConfirmed
+				}
+			});
+			republishDialog.close();
+			toast.success('Edition republished');
+			await loadData();
+		} catch (error) {
+			republishError = error instanceof Error ? error.message : 'Could not republish the edition.';
+		} finally {
+			flushingForReview = false;
+			isSubmitting = false;
+		}
+	}
+
 	// --- Resubmit after revisions ---
 	function handleReviewSubmitted() {
 		loadData();
@@ -1199,6 +1276,31 @@
 			{/if}
 		</div>
 
+		{#if canRepublish}
+			<section
+				class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 bg-base-100 p-4"
+				aria-labelledby="republish-heading"
+			>
+				<div>
+					<h2 id="republish-heading" class="font-semibold">Republish edition</h2>
+					<p class="text-sm text-base-content/70">
+						This edition was previously published. An administrator can make it public again without
+						another Final Review, or continue through editorial review.
+					</p>
+				</div>
+				<button
+					type="button"
+					class="btn btn-sm btn-primary"
+					disabled={isSubmitting || isSaving || editionAssetsBusy || coverBusy}
+					onclick={openRepublishDialog}>Republish edition</button
+				>
+			</section>
+		{:else if republishEligibilityError}
+			<p class="mb-5 text-sm text-base-content/70" role="status">
+				Could not check whether this edition can be republished. Reload the page to try again.
+			</p>
+		{/if}
+
 		<!-- Proposal Form — mirrors viewer layout -->
 		{#if viewMode === 'concept-form'}
 			{#if canSubmitConcept}
@@ -1348,8 +1450,9 @@
 									<div class="space-y-2">
 										<h3 class="text-sm font-semibold">Model files</h3>
 										<p class="text-xs text-base-content/80">
-											Add one GLB, GLTF, OBJ, or PLY model at a time. Select or drop the primary model
-											and its companion files together, without zipping them. Maximum 200 MB per file.
+											Add one GLB, GLTF, OBJ, or PLY model at a time. Select or drop the primary
+											model and its companion files together, without zipping them. Maximum 200 MB
+											per file.
 										</p>
 										{#if editionRecord}
 											<ProposalModelUploads
@@ -2420,9 +2523,9 @@
 				Unpublish for final revisions
 			</h2>
 			<p class="mt-2 text-sm text-base-content/70">
-				This removes the edition from public view, clears its publication claim, and returns it to
-				Final Revisions. A new Final Review and publication request are required before
-				republication.
+				This removes the edition from public view, clears the peer review badge, and returns it to
+				Final Revisions. After editing, an administrator can republish it without another Final
+				Review. The editorial review route is still available.
 			</p>
 			<label class="mt-4 block" for="unpublish-reason">
 				<span class="mb-1 block text-sm font-medium">Reason for this audit entry</span>
@@ -2451,6 +2554,59 @@
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button aria-label="Close unpublish dialog">close</button>
+		</form>
+	</dialog>
+
+	<dialog bind:this={republishDialog} class="modal" aria-labelledby="republish-edition-title">
+		<form
+			class="modal-box"
+			onsubmit={(event) => {
+				event.preventDefault();
+				void republishEdition();
+			}}
+		>
+			<h2 id="republish-edition-title" class="text-lg font-semibold">Republish edition</h2>
+			<p class="mt-2 text-sm text-base-content/70">
+				This makes the current edition public at the same address. The revised edition will not
+				display a peer review badge. Previous reviews stay in the workflow history.
+			</p>
+			<label class="mt-4 block" for="republish-reason">
+				<span class="mb-1 block text-sm font-medium">Reason for republishing</span>
+				<textarea
+					id="republish-reason"
+					class="textarea-bordered textarea w-full"
+					bind:value={republishReason}
+					maxlength="5000"
+					disabled={isSubmitting}
+					required
+				></textarea>
+			</label>
+			<label class="mt-3 flex items-start gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="checkbox checkbox-sm"
+					bind:checked={republishRightsConfirmed}
+					disabled={isSubmitting}
+					required
+				/>
+				I confirm that we have the rights or permission to publish the revised edition and all its materials.
+			</label>
+			{#if republishError}<p class="mt-3 text-sm text-error" role="alert">{republishError}</p>{/if}
+			<div class="modal-action">
+				<button
+					type="button"
+					class="btn btn-outline"
+					disabled={isSubmitting}
+					onclick={() => republishDialog.close()}>Cancel</button
+				>
+				<button
+					type="submit"
+					class="btn btn-primary"
+					disabled={isSubmitting || !republishReason.trim() || !republishRightsConfirmed}
+				>
+					{isSubmitting ? 'Republishing…' : 'Republish edition'}
+				</button>
+			</div>
 		</form>
 	</dialog>
 

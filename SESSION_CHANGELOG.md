@@ -74,4 +74,11 @@
 - 2026-11-19 · OpenCode · Made shared public open-call cards compact and horizontal in wide containers, with smaller uncropped covers on narrow screens. Modal unchanged; not deployed.
 - 2026-11-19 · OpenCode · Applied the existing homepage scroll reveal to the Thematic Calls heading and cards, and reserved fixed square cover frames before image loading. No deployment.
 - 2026-11-19 · OpenCode · Verified PURE3D’s public OVHcloud mail settings and drafted partner-facing mailbox setup instructions. No email sent or mailbox access attempted.
+- 2026-11-19 · OpenCode · Closed PURE3D GitHub issues #124, #125 and #126 as completed and verified all three closure states.
 - 2026-11-19 · OpenCode · Checked the OVHcloud MCP tool catalogue for a mailbox password reset. No supported reset tool was exposed; no credentials changed.
+- 2026-11-20 · OpenCode · Updated the milestone 9 proposal form, protected model downloads and co-author guidance on local main (#118–123).
+- 2026-11-20 · OpenCode · Confirmed live PocketBase is missing the existing unpublish route and handler (#78). Backend rollout, schema migration, and GitHub handoff are pending approval.
+- 2026-11-20 · OpenCode · Deployed scoped milestone 9 PocketBase hooks and the optional proposal references field after verified backups. Confirmed health, public field redaction and authentication on the unpublish route; no production edition was changed.
+- 2026-11-20 · OpenCode · Pushed `6c99bc1` to `main`; release run `44759273028` is in progress. After Pages confirms the deployed commit, assign and comment on #78 and #118–123 for Kelly.
+- 2026-11-20 · OpenCode · Verified CI and Pages deployment of v2.8.1 from `6c99bc1`. Assigned #78 and #118–123 to Kelly, verified one fix comment on each, and left all seven open for review.
+- 2026-11-23 · OpenCode · Added audited admin republication on the edition Workflow page for #78, including editions already withdrawn and moved to Final Review. Svelte compilation and hook syntax checks passed; no application tests, deployment, or production record changes.

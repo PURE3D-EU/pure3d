@@ -15,6 +15,10 @@ The hook protects the new field and updates proposal validation. Back up and ver
 change before publishing the frontend, which expects the new field when saving a proposal. Keep the
 legacy `proposalType` field and its data; the form no longer uses it. The unpublish action (#78)
 separately requires the route in `orcid.pb.js` and the handler in `admin-workflow-service.cjs`.
+The follow-up admin republication action also needs the updated `publication-service.cjs`. It
+uses existing unpublish audit records, so editions already withdrawn through this workflow can
+be republished without a schema change or a new review. It does not restore a peer review badge
+for the revised version.
 
 Main-push releases always run with `--patch`: maintenance commits receive a patch release, while
 `feat` and breaking commits still take precedence and produce minor and major releases. Release

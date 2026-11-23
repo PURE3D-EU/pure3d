@@ -326,6 +326,7 @@ module.exports = {
 	fields,
 	answersError,
 	requestError,
+	metadataError,
 	prepareEdition,
 	progress,
 	decision,

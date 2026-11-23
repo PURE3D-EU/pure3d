@@ -383,6 +383,18 @@ routerAdd(
 	(e) => require(__hooks + '/admin-workflow-service.cjs').unpublish(e),
 	$apis.requireAuth()
 );
+routerAdd(
+	'GET',
+	'/api/pure3d/editions/{editionId}/republish',
+	(e) => require(__hooks + '/admin-workflow-service.cjs').republishEligibility(e),
+	$apis.requireAuth()
+);
+routerAdd(
+	'POST',
+	'/api/pure3d/editions/{editionId}/republish',
+	(e) => require(__hooks + '/admin-workflow-service.cjs').republish(e),
+	$apis.requireAuth()
+);
 onRecordDelete(
 	(e) => require(__hooks + '/activity-service.cjs').model(e),
 	'users',
