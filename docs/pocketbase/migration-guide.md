@@ -24,9 +24,9 @@ collections defined in `pocketbase/pb_schema/collections.json`. Legacy `project`
 become `collections`; new code must not query an obsolete PocketBase `projects` collection.
 
 Both content collections use ordered `credits` with exact names, duplicates, person/organization
-types and creator/contributor roles. Every person creator requires ORCID before submission or
-publication. Contributor ORCIDs are optional. Never manufacture OAuth proof or silently downgrade
-an unresolved author to a contributor/collaborator.
+types and creator/contributor roles. ORCIDs are optional for credits in the application; legacy
+migration safeguards are separate. Never manufacture OAuth proof or silently downgrade an
+unresolved author to a contributor/collaborator.
 
 ## Application Authentication
 

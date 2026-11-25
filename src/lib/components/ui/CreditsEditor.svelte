@@ -29,11 +29,10 @@
 <div id="credits-editor" class="space-y-3">
 	{#if !authorsOnly}<h3 class="font-semibold">Creators and contributors</h3>{/if}
 	<p class="text-sm text-base-content/70">
-		{#if authorsOnly}To add co-authors, please add them with their name and ORCID ID. Adding an
-			author at this stage of the process will give them credit. Editing rights for co-authors
-			are done at a later stage.
-		{:else}Every individual creator needs an ORCID to submit or publish. Organisations do not.
-			Contributors are optional. Linking a user does not grant access.{/if}
+		{#if authorsOnly}Add co-authors by name. You can include their ORCID if they have one. Adding a
+			co-author gives them credit, not editing access.
+		{:else}ORCID is optional for people. Organisations do not have ORCIDs. Contributors are
+			optional. Linking a user does not grant access.{/if}
 	</p>
 	{#each credits as credit, index (credit)}
 		<fieldset
@@ -88,7 +87,7 @@
 					>
 				{/if}
 				<label class="form-control"
-					>ORCID<input
+					>ORCID (optional)<input
 						class="input-bordered input w-full"
 						value={credit.orcid ?? ''}
 						oninput={(event) => (credit.orcid = event.currentTarget.value || null)}

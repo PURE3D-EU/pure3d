@@ -102,7 +102,7 @@ function sameCredits(a, b) {
 	);
 }
 
-function credits(value, previous, requireCreators, lookupUser, allowCreatorWithoutOrcid = false) {
+function credits(value, previous, requireCreators, lookupUser) {
 	if (!Array.isArray(value) || value.length > 200)
 		throw new Error('credits must be an array (max 200)');
 	let creators = 0;
@@ -152,11 +152,7 @@ function credits(value, previous, requireCreators, lookupUser, allowCreatorWitho
 			if (!(previous || []).some((old) => sameCredit(old, out)))
 				throw new Error('OAuth provenance requires a verified linked account');
 		}
-		if (out.role === 'creator') {
-			creators++;
-			if (requireCreators && out.type === 'person' && !out.orcid && !allowCreatorWithoutOrcid)
-				throw new Error('Every individual creator needs an ORCID before submission or publication');
-		}
+		if (out.role === 'creator') creators++;
 		return out;
 	});
 	if (requireCreators && !creators)

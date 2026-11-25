@@ -30,7 +30,7 @@ Powered by the Smithsonian Voyager Explorer, embedded directly or via iframe.
 - [x] ORCID identity backend and ordered person/organization credit model
 - [x] Manual attribution review without name-based account linking
 - [ ] Production ORCID-only registration/sign-in cutover and deployment verification
-- [ ] Every individual author's ORCID resolved before submission/publication; no legacy exemptions
+- [x] Optional ORCIDs on creator and contributor credits, separate from account verification
 - Production registration, hooks, credentials and rollout blockers: [ORCID operations](docs/orcid.md)
 
 ### Content

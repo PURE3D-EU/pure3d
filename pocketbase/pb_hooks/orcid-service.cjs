@@ -668,8 +668,7 @@ function validateRecord(e) {
 					json(r, 'credits') || [],
 					json(r.original(), 'credits') || [],
 					entering || editingPublic,
-					(id) => creditUser(e.app, id),
-					adminWorkflowOverride
+					(id) => creditUser(e.app, id)
 				)
 			);
 			r.set('credits', validated);
@@ -685,8 +684,7 @@ function validateRecord(e) {
 					json(parent, 'credits') || [],
 					json(parent, 'credits') || [],
 					true,
-					(id) => creditUser(e.app, id),
-					adminWorkflowOverride
+					(id) => creditUser(e.app, id)
 				)
 			);
 		}

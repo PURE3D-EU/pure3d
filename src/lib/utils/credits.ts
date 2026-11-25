@@ -52,13 +52,6 @@ export function validateCredits(credits: Credit[], forPublication = false): stri
 		if (!credit.name.trim()) return `Credit ${index + 1}: name is required.`;
 		if (credit.orcid && !normalizeOrcid(credit.orcid))
 			return `Credit ${index + 1}: enter a valid ORCID (including its checksum).`;
-		if (
-			forPublication &&
-			credit.role === 'creator' &&
-			credit.type === 'person' &&
-			!normalizeOrcid(credit.orcid)
-		)
-			return `Creator ${credit.name}: ORCID is required to submit or publish.`;
 	}
 	return null;
 }

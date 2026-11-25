@@ -67,17 +67,14 @@ token passes native verification and reaches the hook's intentional test-provide
 tampered signatures, audience, issuer, expiry and an explicit mismatched key algorithm fail earlier.
 This is synthetic regression evidence, **not a live ORCID authentication claim**.
 
-## Author Requirements
+## Author Credits
 
-Keep each author's work connected to the right person. **Every individual author needs a valid
-ORCID before submission or publication**, including co-authors. Do not invent identifiers, guess
-identities from names, classify an unknown person as an organization to evade the requirement, or
-grant permanent legacy exemptions. Unresolved attribution belongs in a review queue until the
-author supplies or confirms an identifier. Authors are person credits with `role: 'creator'`;
-their ORCIDs are mandatory. Contributor ORCIDs are optional. The migration, frontend and backend
-block submission/publication when a person creator lacks ORCID or there are no creators.
+ORCIDs are optional for creator and contributor credits in the application. Submission and
+publication still require at least one creator, and any supplied ORCID must be valid. Use the
+person's confirmed identifier; do not invent one or infer it from a name. Legacy migration
+safeguards and verified account requirements are separate from credit attribution.
 
-Adding a co-author's name and ORCID to a proposal gives them credit, not access. Neither proposal
+Adding a co-author to a proposal gives them credit, not access. Neither proposal
 approval nor signing in with that ORCID grants editing rights automatically. After approval, the
 submitting author can use the **Team** tab on the edition's Workflow page to add the co-author's account as a
 collaborator once they have signed in.
@@ -651,7 +648,8 @@ recovery, and `report:authors` for private attribution inventory (not a whole-da
 - Exercise real ORCID registration and sign-in on desktop/mobile; check state/PKCE, callback, scope,
   expired/wrong issuer/audience tokens, duplicate identities, and rejected automatic name/email linking.
 - Confirm public browsing remains possible, OAuth-only login is enforced, `_superusers` recovery still
-  works, role/membership checks hold, and no unresolved individual author can submit or publish.
+  works and role/membership checks hold. A missing ORCID on a credit no longer blocks
+  submission or publication in the application.
 - Confirm `--prepare` preserves login, rules and existing sessions; then verify `--apply` rejects old
   users JWT access/refresh, requires fresh ORCID sign-in and preserves superuser sessions. Rehearse
   missing prepared fields, unapproved privileged mappings and backup failure before rollout.
