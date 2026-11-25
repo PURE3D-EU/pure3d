@@ -2317,7 +2317,7 @@ integration(
 	}
 );
 
-integration('admin unpublishing restores private editing with an audit trail', async () => {
+integration('an admin can unpublish, edit and republish with an unlinked co-author', async () => {
 	const visitor = new PocketBase(origin);
 	const scene = JSON.stringify({
 		asset: { type: 'application/si-dpo-3d.document+json', version: '1.0' },
@@ -2326,9 +2326,15 @@ integration('admin unpublishing restores private editing with an audit trail', a
 	});
 	const edition = await root.collection('editions').create({
 		title: 'Published edition for revisions',
+		dcAbstract: 'Original description.',
+		dcLanguage: 'English',
+		dcRightsLicense: 'CC BY 4.0',
 		status: 'published',
 		isPublished: true,
-		credits: [credit],
+		credits: [
+			credit,
+			{ type: 'person', name: 'Co-author', orcid: null, role: 'creator', provenance: 'manual' }
+		],
 		sceneDocument: new File([scene], 'scene.svx.json')
 	});
 	await root.collection('editionUsers').create({
@@ -2418,10 +2424,26 @@ integration('admin unpublishing restores private editing with an audit trail', a
 		performedBy: 'users/' + admin.authStore.record!.id,
 		details: { from: 'published', to: 'final_revisions', reason }
 	});
+	await admin.send(`/api/pure3d/editions/${edition.id}/republish`, {
+		method: 'POST',
+		body: {
+			expectedStatus: reopened.status,
+			expectedUpdated: reopened.updated,
+			reason: 'Publish the corrected description.',
+			rightsConfirmed: true
+		}
+	});
+	expect(await visitor.collection('editions').getOne(edition.id)).toMatchObject({
+		title: 'Corrected edition title',
+		status: 'published',
+		isPublished: true,
+		peerReviewStamp: false,
+		credits: edition.credits
+	});
 });
 
 integration(
-	'legacy publication can be preserved but missing creator IDs block new submission/publication',
+	'published legacy editions stay locked and visible collections can credit people without ORCIDs',
 	async () => {
 		await expect(
 			admin.collection('editions').update('legacy000000000', { title: 'Preserved attribution' })
@@ -2435,15 +2457,17 @@ integration(
 		await expect(
 			admin.collection('editions').update('legacy000000000', { status: 'concept_submitted' })
 		).rejects.toBeDefined();
-		await expect(
-			admin.collection('collections').create({
-				title: 'Missing IDs',
-				isVisible: true,
-				credits: [
-					{ type: 'person', name: 'Creator', orcid: null, role: 'creator', provenance: 'manual' }
-				]
-			})
-		).rejects.toBeDefined();
+		const credits = [
+			{ type: 'person', name: 'Creator', orcid: null, role: 'creator', provenance: 'manual' }
+		];
+		const collection = await admin.collection('collections').create({
+			title: 'Named creator',
+			isVisible: true,
+			credits
+		});
+		expect(
+			await new PocketBase(origin).collection('collections').getOne(collection.id)
+		).toMatchObject({ isVisible: true, credits });
 	}
 );
 

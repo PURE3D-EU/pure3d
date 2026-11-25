@@ -88,6 +88,9 @@ onBootstrap((e) => {
 		}
 		for (const field of definition.fields.filter((field) => field.type !== 'relation'))
 			collection.fields.add(new Field(field));
+		// Edition republication uses the timestamp installed by migrate-documentation.ts.
+		if (definition.name === 'editions' && !collection.fields.getByName('updated'))
+			collection.fields.add(new AutodateField({ name: 'updated', onCreate: true, onUpdate: true }));
 		for (const key of ['listRule', 'viewRule', 'createRule', 'updateRule', 'deleteRule'])
 			collection[key] = '';
 		e.app.save(collection);
