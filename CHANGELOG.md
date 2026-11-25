@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.10.0 - 2026-11-25
+
+### Features
+
+- feature Amateur Home Cinema in feed (383dc1cd)
+
 ## v2.9.1 - 2026-11-25
 
 ### Fixes
