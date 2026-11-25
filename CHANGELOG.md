@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.9.1 - 2026-11-25
+
+### Fixes
+
+- make ORCID optional for credited people (663ee7d7)
+
+### Maintenance
+
+- test(workflow): cover republication without co-author ORCIDs (a89cdce9)
+
 ## v2.9.0 - 2026-11-23
 
 ### Features
