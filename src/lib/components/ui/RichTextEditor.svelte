@@ -98,6 +98,7 @@
 		minHeight?: string;
 		enableImagePaste?: boolean;
 		uploadImage?: (file: File) => Promise<string>;
+		onImageError?: (message: string) => void;
 		onchange?: (html: string) => void;
 		cmsComponents?: boolean;
 		cmsEditions?: { id: string; title: string }[];
@@ -111,6 +112,7 @@
 		minHeight = '200px',
 		enableImagePaste = false,
 		uploadImage,
+		onImageError,
 		onchange,
 		cmsComponents = false,
 		cmsEditions = [],
@@ -865,6 +867,9 @@
 					.setImage({ src: url, alt: file.name || 'Pasted image' })
 					.run();
 			}
+		} catch (error) {
+			if (!onImageError) throw error;
+			onImageError(error instanceof Error ? error.message : 'Could not attach the screenshot.');
 		} finally {
 			isUploadingImage = false;
 		}

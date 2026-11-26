@@ -1,6 +1,6 @@
 <script lang="ts">
 	/* eslint-disable svelte/no-navigation-without-resolve -- Editable links are validated and resolved before rendering. */
-	import { base } from '$app/paths';
+	import { base, resolve } from '$app/paths';
 	import { beforeNavigate } from '$app/navigation';
 	import { pb } from '$lib/database/client';
 	import NewsletterSignup from './NewsletterSignup.svelte';
@@ -293,6 +293,7 @@
 				{$menus.footer.helpText}
 				{#if help}<a class="underline" href={href(help.href)}>{help.label}</a>{/if}
 			</p>
+			<a class="underline sm:hidden" href={resolve('/feedback')}>Send feedback</a>
 			{#if primary}<a class="btn btn-sm btn-primary" href={href(primary.href)}>{primary.label}</a
 				>{/if}
 			{#if authStore.globalRole === 'admin' && !editing}<button

@@ -81,6 +81,8 @@
 	let categoryFilter = $state('');
 	let severityFilter = $state('');
 	let expandedId = $state<string | null>(null);
+	let imageToken = $state('');
+	let imageTokenError = $state(false);
 	let recipients = $state<FeedbackRecipient[]>([]);
 	let recipientEmail = $state('');
 	let isLoadingRecipients = $state(true);
@@ -281,12 +283,24 @@
 		return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
 	}
 
-	function imageUrl(item: FeedbackEntry, filename: string) {
-		return pb.files.getURL(item.record, filename, { thumb: '400x300' });
+	async function toggleFeedback(item: FeedbackEntry) {
+		expandedId = expandedId === item.id ? null : item.id;
+		imageToken = '';
+		imageTokenError = false;
+		if (!expandedId || !item.images.length) return;
+		try {
+			const token = await pb.files.getToken();
+			if (expandedId === item.id) {
+				imageToken = token;
+				imageTokenError = !token;
+			}
+		} catch {
+			if (expandedId === item.id) imageTokenError = true;
+		}
 	}
 
-	function fullImageUrl(item: FeedbackEntry, filename: string) {
-		return pb.files.getURL(item.record, filename);
+	function imageUrl(item: FeedbackEntry, filename: string, thumb?: string) {
+		return pb.files.getURL(item.record, filename, { token: imageToken, thumb });
 	}
 
 	function statusBadgeClass(status: string) {
@@ -469,7 +483,7 @@
 					<button
 						type="button"
 						class="flex w-full flex-wrap items-center gap-3 p-4 text-left"
-						onclick={() => (expandedId = expandedId === item.id ? null : item.id)}
+						onclick={() => toggleFeedback(item)}
 					>
 						<div class="min-w-0 flex-1">
 							<div class="flex flex-wrap items-center gap-2">
@@ -537,22 +551,25 @@
 										{contentText(item.feedbackHtml) || 'No written feedback.'}
 									</div>
 
-									{#if item.images.length > 0}
+									{#if item.images.length && imageToken}
 										<div class="grid grid-cols-2 gap-3 md:grid-cols-3">
 											{#each item.images as filename (filename)}
-												<SafeLink
-													href={fullImageUrl(item, filename)}
-													target="_blank"
-													rel="noreferrer"
-												>
+												<SafeLink href={imageUrl(item, filename)} target="_blank" rel="noreferrer">
 													<img
-														src={imageUrl(item, filename)}
+														src={imageUrl(item, filename, '400x300')}
+														referrerpolicy="no-referrer"
 														alt="Feedback screenshot"
 														class="aspect-video w-full rounded border border-base-300 object-cover"
 													/>
 												</SafeLink>
 											{/each}
 										</div>
+									{:else if item.images.length}
+										<p class="text-sm" role="status">
+											{imageTokenError
+												? 'Could not load screenshots. Close and reopen this feedback to try again.'
+												: 'Loading screenshots…'}
+										</p>
 									{/if}
 								</div>
 

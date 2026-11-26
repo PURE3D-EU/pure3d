@@ -2,11 +2,12 @@ function plainText(value) {
 	return String(value || '')
 		.replace(/&nbsp;/g, ' ')
 		.replace(/<[^>]*>/g, ' ')
+		.replace(/&(amp|lt|gt);/g, (_, entity) => ({ amp: '&', lt: '<', gt: '>' })[entity])
 		.replace(/\s+/g, ' ')
 		.trim();
 }
 function shouldQueue(previousStatus, currentStatus) {
-	return previousStatus === 'draft' && currentStatus === 'submitted';
+	return (previousStatus === '' || previousStatus === 'draft') && currentStatus === 'submitted';
 }
 function deliveryEnabled(environmentValue, smtpEnabled) {
 	return environmentValue === 'true' && smtpEnabled === true;

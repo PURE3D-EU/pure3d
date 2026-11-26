@@ -1,5 +1,11 @@
 # Feedback email delivery
 
+Visitors and members submit through `POST /api/pure3d/feedback`, not through the admin-only
+collection API. The endpoint saves the note and any screenshots together, applies submission
+limits, and never sends mail inline. Screenshot downloads require an admin file token.
+Deploy `feedback-submission.pb.js` and `feedback-email-service.cjs` before releasing the matching
+frontend. No collection rule change or schema migration is needed to accept feedback.
+
 Feedback email is disabled unless `PURE3D_FEEDBACK_EMAIL_ENABLED=true`. A feedback submission is
 queued only when that opt-in is already enabled, so enabling it later does not replay feedback
 submitted while delivery was disabled. SMTP must also be enabled before the worker sends mail.

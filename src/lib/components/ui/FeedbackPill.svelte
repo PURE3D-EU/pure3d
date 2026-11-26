@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { base, resolve } from '$app/paths';
 	import { page } from '$app/stores';
-	import { pb } from '$lib/database/client';
+	import { feedbackPageUrl, feedbackSubmission } from '$lib/database/feedback';
 	import { authStore } from '$lib/database/stores/auth.svelte';
 	import toast from 'svelte-french-toast';
-	import type { RecordModel } from 'pocketbase';
 
 	const categoryOptions = [
 		{ value: 'bug', label: 'Bug' },
@@ -27,7 +26,9 @@
 	let modal: HTMLDialogElement | undefined = $state();
 	let isOpen = $state(false);
 	let isSubmitting = $state(false);
-	let feedbackRecord: RecordModel | null = $state(null);
+	const submission = feedbackSubmission();
+	onDestroy(submission.clear);
+	let submissionError = $state('');
 	let participantName = $state('');
 	let participantEmail = $state('');
 	let relatedUrl = $state('');
@@ -39,17 +40,12 @@
 	>(null);
 	let editorLoadError = $state('');
 
-	let isFeedbackPage = $derived(
-		$page.url.pathname === `${base}/feedback` || $page.url.pathname === '/feedback'
-	);
-
-	onMount(() => {
-		participantName = authStore.user?.nickname || authStore.user?.email?.split('@')[0] || '';
-		participantEmail = authStore.user?.email || '';
-	});
+	let isFeedbackPage = $derived($page.url.pathname.replace(/\/$/, '') === `${base}/feedback`);
 
 	function openFeedback() {
-		relatedUrl = window.location.href;
+		participantName ||= authStore.user?.nickname || authStore.user?.email?.split('@')[0] || '';
+		participantEmail ||= authStore.user?.email || '';
+		relatedUrl ||= feedbackPageUrl();
 		isOpen = true;
 		modal?.showModal();
 		void loadRichTextEditor();
@@ -70,73 +66,25 @@
 		isOpen = false;
 	}
 
-	function browserInfo() {
-		return {
-			userAgent: navigator.userAgent,
-			language: navigator.language,
-			viewport: `${window.innerWidth}x${window.innerHeight}`,
-			devicePixelRatio: window.devicePixelRatio
-		};
-	}
-
-	async function ensureFeedbackRecord() {
-		if (feedbackRecord) return feedbackRecord;
-		const record = await pb.collection('feedback').create({
-			participantName,
-			participantEmail,
-			editionUrl: relatedUrl,
-			category,
-			severity,
-			feedbackHtml,
-			pageUrl: window.location.href,
-			browserInfo: browserInfo(),
-			status: 'draft',
-			createdBy: authStore.appUserId || ''
-		});
-		feedbackRecord = record;
-		return record;
-	}
-
-	async function uploadFeedbackImage(file: File): Promise<string> {
-		const record = await ensureFeedbackRecord();
-		const form = new FormData();
-		form.append('images+', file);
-		const updated = await pb.collection('feedback').update(record.id, form);
-		feedbackRecord = updated;
-		const filenames = Array.isArray(updated.images) ? updated.images : [];
-		const filename = filenames.at(-1);
-		if (!filename) throw new Error('Image upload did not return a file');
-		return pb.files.getURL(updated, filename);
-	}
-
 	async function submitFeedback() {
-		if (!feedbackHtml || feedbackHtml === '<p></p>') {
-			toast.error('Please add a short note before submitting feedback');
-			return;
-		}
-
+		if (isSubmitting) return;
+		submissionError = '';
 		isSubmitting = true;
 		try {
-			const record = await ensureFeedbackRecord();
-			await pb.collection('feedback').update(record.id, {
+			await submission.send({
 				participantName,
 				participantEmail,
 				editionUrl: relatedUrl,
 				category,
 				severity,
-				feedbackHtml,
-				pageUrl: window.location.href,
-				browserInfo: browserInfo(),
-				status: 'submitted',
-				createdBy: authStore.appUserId || ''
+				feedbackHtml
 			});
 			toast.success('Thank you — feedback submitted');
 			feedbackHtml = '';
-			feedbackRecord = null;
+			relatedUrl = '';
 			closeFeedback();
 		} catch (error) {
-			console.error('Failed to submit feedback:', error);
-			toast.error((error as Error).message || 'Failed to submit feedback');
+			submissionError = (error as Error).message || 'Could not send feedback. Please try again.';
 		} finally {
 			isSubmitting = false;
 		}
@@ -149,19 +97,28 @@
 	</button>
 {/if}
 
-<dialog bind:this={modal} class="modal" onclose={() => (isOpen = false)}>
+<dialog
+	id="feedback-pill"
+	bind:this={modal}
+	class="modal"
+	aria-labelledby="feedback-pill-title"
+	onclose={() => (isOpen = false)}
+>
 	<div class="modal-box max-w-3xl border border-base-300 bg-base-100 p-0 shadow-2xl">
 		<div class="border-b border-base-300 bg-base-200/60 px-5 py-4">
 			<div class="flex items-start justify-between gap-4">
 				<div>
 					<p class="text-xs font-semibold tracking-wide text-primary uppercase">Send Feedback</p>
-					<h2 class="text-xl font-bold">What did you notice?</h2>
+					<h2 id="feedback-pill-title" class="text-xl font-bold">What did you notice?</h2>
 					<p class="mt-1 text-sm text-base-content/60">
-						Bugs, confusion, screenshots, slow moments, and ideas are all useful.
+						No account is needed. Only PURE3D administrators can see what you send.
 					</p>
 				</div>
-				<button type="button" class="btn btn-circle btn-ghost btn-sm" onclick={closeFeedback}
-					>✕</button
+				<button
+					type="button"
+					class="btn btn-circle btn-ghost btn-sm"
+					aria-label="Close feedback form"
+					onclick={closeFeedback}>✕</button
 				>
 			</div>
 		</div>
@@ -177,7 +134,7 @@
 				<div class="rounded-box border border-base-300 bg-base-200/30 p-4">
 					<div class="grid gap-4 md:grid-cols-2">
 						<label class="form-control gap-1">
-							<span class="label-text text-xs font-medium text-base-content/70">Name</span>
+							<span class="label-text text-xs font-medium text-base-content/70">Name optional</span>
 							<input
 								class="feedback-field input-bordered input input-sm w-full"
 								bind:value={participantName}
@@ -235,7 +192,8 @@
 							placeholder="Write feedback here. You can paste screenshots."
 							minHeight="220px"
 							enableImagePaste
-							uploadImage={uploadFeedbackImage}
+							uploadImage={async (file) => submission.stageImage(file, feedbackHtml)}
+							onImageError={(message) => (submissionError = message)}
 							onchange={(html) => (feedbackHtml = html)}
 						/>
 					{:else if editorLoadError}
@@ -248,6 +206,7 @@
 					{/if}
 				</div>
 
+				{#if submissionError}<p class="text-sm text-error" role="alert">{submissionError}</p>{/if}
 				<div class="flex items-center justify-between gap-3 border-t border-base-300 pt-4">
 					<a class="link text-sm link-primary" href={resolve('/feedback')}>Open feedback page</a>
 					<div class="flex gap-2">
@@ -308,7 +267,7 @@
 		border-bottom-left-radius: var(--radius-box, 1rem);
 	}
 
-	@media (max-width: 640px) {
+	@media (width < 640px) {
 		.feedback-pill {
 			display: none;
 		}

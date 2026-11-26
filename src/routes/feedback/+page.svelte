@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
-	import { pb } from '$lib/database/client';
+	import { feedbackSubmission } from '$lib/database/feedback';
 	import { authStore } from '$lib/database/stores/auth.svelte';
 	import RichTextEditor from '$lib/components/ui/RichTextEditor.svelte';
 	import toast from 'svelte-french-toast';
-	import type { RecordModel } from 'pocketbase';
 
 	const categoryOptions = [
 		{ value: 'bug', label: 'Bug' },
@@ -26,7 +25,9 @@
 	];
 
 	let isSubmitting = $state(false);
-	let feedbackRecord: RecordModel | null = $state(null);
+	const submission = feedbackSubmission();
+	onDestroy(submission.clear);
+	let submissionError = $state('');
 	let participantName = $state('');
 	let participantEmail = $state('');
 	let relatedUrl = $state('');
@@ -40,72 +41,23 @@
 		relatedUrl = $page.url.searchParams.get('from') || '';
 	});
 
-	function browserInfo() {
-		return {
-			userAgent: navigator.userAgent,
-			language: navigator.language,
-			viewport: `${window.innerWidth}x${window.innerHeight}`,
-			devicePixelRatio: window.devicePixelRatio
-		};
-	}
-
-	async function ensureFeedbackRecord() {
-		if (feedbackRecord) return feedbackRecord;
-		const record = await pb.collection('feedback').create({
-			participantName,
-			participantEmail,
-			editionUrl: relatedUrl,
-			category,
-			severity,
-			feedbackHtml,
-			pageUrl: window.location.href,
-			browserInfo: browserInfo(),
-			status: 'draft',
-			createdBy: authStore.appUserId || ''
-		});
-		feedbackRecord = record;
-		return record;
-	}
-
-	async function uploadFeedbackImage(file: File): Promise<string> {
-		const record = await ensureFeedbackRecord();
-		const form = new FormData();
-		form.append('images+', file);
-		const updated = await pb.collection('feedback').update(record.id, form);
-		feedbackRecord = updated;
-		const filenames = Array.isArray(updated.images) ? updated.images : [];
-		const filename = filenames.at(-1);
-		if (!filename) throw new Error('Image upload did not return a file');
-		return pb.files.getURL(updated, filename);
-	}
-
 	async function submitFeedback() {
-		if (!feedbackHtml || feedbackHtml === '<p></p>') {
-			toast.error('Please add a short note before submitting feedback');
-			return;
-		}
-
+		if (isSubmitting) return;
+		submissionError = '';
 		isSubmitting = true;
 		try {
-			const record = await ensureFeedbackRecord();
-			feedbackRecord = await pb.collection('feedback').update(record.id, {
+			await submission.send({
 				participantName,
 				participantEmail,
 				editionUrl: relatedUrl,
 				category,
 				severity,
-				feedbackHtml,
-				pageUrl: window.location.href,
-				browserInfo: browserInfo(),
-				status: 'submitted',
-				createdBy: authStore.appUserId || ''
+				feedbackHtml
 			});
 			toast.success('Thank you — feedback submitted');
 			feedbackHtml = '';
-			feedbackRecord = null;
 		} catch (error) {
-			console.error('Failed to submit feedback:', error);
-			toast.error((error as Error).message || 'Failed to submit feedback');
+			submissionError = (error as Error).message || 'Could not send feedback. Please try again.';
 		} finally {
 			isSubmitting = false;
 		}
@@ -116,7 +68,7 @@
 	<title>Feedback | PURE3D</title>
 </svelte:head>
 
-<div class="container mx-auto max-w-5xl px-4 py-10">
+<div id="feedback-page" class="container mx-auto max-w-5xl px-4 py-10">
 	<div class="mb-8 rounded-box bg-primary/10 p-6 ring-1 ring-primary/20 md:p-8">
 		<p class="mb-2 text-sm font-semibold tracking-wide text-primary uppercase">Feedback</p>
 		<h1 class="text-3xl font-bold md:text-4xl">Tell us what you notice</h1>
@@ -135,8 +87,8 @@
 		<div class="mb-5">
 			<h2 class="text-xl font-semibold">Feedback form</h2>
 			<p class="mt-1 text-sm text-base-content/60">
-				Anything you find is valid: bugs, confusing wording, missing labels, visual issues,
-				unexpected behaviour, or ideas. You can paste screenshots directly into the rich text box.
+				No account is needed. You can paste screenshots into the text box. Only PURE3D administrators
+				can see what you send.
 			</p>
 		</div>
 
@@ -149,7 +101,7 @@
 		>
 			<div class="grid gap-4 md:grid-cols-2">
 				<label class="form-control">
-					<span class="label pt-0 pb-1"><span class="label-text text-xs">Name</span></span>
+					<span class="label pt-0 pb-1"><span class="label-text text-xs">Name optional</span></span>
 					<input class="input-bordered input" bind:value={participantName} />
 				</label>
 
@@ -195,10 +147,12 @@
 				placeholder="What did you notice? You can paste screenshots here."
 				minHeight="300px"
 				enableImagePaste
-				uploadImage={uploadFeedbackImage}
+				uploadImage={async (file) => submission.stageImage(file, feedbackHtml)}
+				onImageError={(message) => (submissionError = message)}
 				onchange={(html) => (feedbackHtml = html)}
 			/>
 
+			{#if submissionError}<p class="text-sm text-error" role="alert">{submissionError}</p>{/if}
 			<div class="flex justify-end">
 				<button class="btn btn-primary" disabled={isSubmitting}>
 					{#if isSubmitting}<span class="loading loading-xs loading-spinner"></span>{/if}
