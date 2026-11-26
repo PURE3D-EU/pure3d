@@ -230,7 +230,7 @@ export function contentText(html: string): string {
 	return (document.body.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-export function cleanContent(html: string): string {
+export function cleanContent(html: string, voyagerMedia = false): string {
 	// The application is an SPA; never emit unsanitised HTML during server evaluation.
 	if (!purifier) return '';
 	const normalised = normaliseContentHtml(html).replace(
@@ -240,6 +240,10 @@ export function cleanContent(html: string): string {
 	);
 	return purifier.sanitize(normalised, {
 		ALLOWED_TAGS: contentTags,
+		...(voyagerMedia && {
+			ADD_TAGS: ['audio', 'video', 'source'],
+			ADD_ATTR: ['controls', 'type', 'poster']
+		}),
 		ALLOWED_ATTR: [
 			'href',
 			'src',

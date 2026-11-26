@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { prepareVoyagerArticle } from './edition-reader';
+	import { loadVoyagerArticle } from './edition-reader';
 	import { normalizeVoyagerArticles, resolveVoyagerAssetUrl } from './edition-content';
 
 	interface Props {
@@ -45,14 +45,9 @@
 		}
 		const controller = new AbortController();
 		loading = true;
-		fetch(url, { signal: controller.signal })
-			.then((response) => {
-				if (!response.ok) throw new Error(`Story request failed (${response.status})`);
-				return response.text();
-			})
+		loadVoyagerArticle(url, assets, article.title, controller.signal)
 			.then((html) => {
-				if (!controller.signal.aborted)
-					content = prepareVoyagerArticle(html, url, article.title, assets);
+				if (!controller.signal.aborted) content = html;
 			})
 			.catch((reason: unknown) => {
 				if (

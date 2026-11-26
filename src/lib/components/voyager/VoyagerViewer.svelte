@@ -20,6 +20,7 @@
 	import type { AnimationApplication } from '../../../../static/voyager/animation-controls.js';
 	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { installViewerFetch } from './viewer-fetch';
+	import { loadVoyagerArticle } from './edition-reader';
 	import {
 		ViewerResources,
 		captureViewerErrors,
@@ -163,6 +164,7 @@
 			system?: {
 				components?: {
 					get?: (type: string) => {
+						getText?: (path: string) => Promise<string>;
 						audioReader?: VoyagerAudioReader;
 						outs?: {
 							sceneLoaded?: RuntimeOutput<boolean>;
@@ -515,8 +517,27 @@
 		contentScope.defer(() => {
 			if (contentResources === contentScope) completeScene = null;
 		});
-		const audioReader =
-			voyagerElement.application?.system?.components?.get?.('CVAssetReader')?.audioReader;
+		const assetReader = voyagerElement.application?.system?.components?.get?.('CVAssetReader');
+		const audioReader = assetReader?.audioReader;
+		if (assetReader?.getText && companionAssets) {
+			const original = assetReader.getText;
+			const controller = new AbortController();
+			assetReader.getText = (path) => {
+				const files = companionAssets;
+				if (files?.baseDir && /\.html?(?:[?#]|$)/i.test(path)) {
+					const article = new URL(path, new URL(files.baseDir, window.location.href));
+					const name = article.pathname.split('/').pop() || '';
+					const mapped = Object.hasOwn(files.byBasename, name) && files.byBasename[name];
+					if (mapped && new URL('.', article).href === new URL('.', mapped).href)
+						return loadVoyagerArticle(mapped, files.byBasename, '', controller.signal);
+				}
+				return original.call(assetReader, path);
+			};
+			contentScope.defer(() => {
+				controller.abort();
+				assetReader.getText = original;
+			});
+		}
 		if (audioReader) {
 			contentScope.defer(repairLegacyAudioLoading(audioReader, voyagerVersion));
 		}
