@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { pb } from '$lib/database/client';
 	import type { RecordModel } from 'pocketbase';
 	import toast from 'svelte-french-toast';
@@ -33,27 +33,39 @@
 		Array.isArray(record.modelAssets) ? (record.modelAssets as string[]) : []
 	);
 	let isObj = $derived(modelFilename.toLowerCase().endsWith('.obj'));
-	let fileSizes = $state<Record<string, number | null>>({});
+	let detailsOpen = $state(false);
+	let fileSizes = $derived.by(() => {
+		// Keep completed lookups across disclosure toggles, not across record revisions.
+		void record.id;
+		void record.updated;
+		return new SvelteMap<string, number | null>();
+	});
 
 	$effect(() => {
+		if (!detailsOpen || !modelFilename) return;
 		const currentRecord = record;
-		const filenames = [modelFilename, ...assetFilenames].filter(Boolean);
+		const sizes = fileSizes;
+		const filenames = [modelFilename, ...assetFilenames].filter(
+			(name) => !untrack(() => sizes.has(name))
+		);
 		const controller = new AbortController();
-		fileSizes = {};
 		if (filenames.length === 0) return;
 		void untrack(async () => {
 			try {
-				const token = currentRecord.isPublished ? '' : await pb.files.getToken();
-				if (controller.signal.aborted) return;
-				await Promise.all(
-					filenames.map(async (filename) => {
-						const size = await fetchFileSize(
-							pb.files.getURL(currentRecord, filename, { token }),
-							controller.signal
-						);
-						if (!controller.signal.aborted) fileSizes[filename] = size;
-					})
-				);
+				const token = currentRecord.isPublished
+					? ''
+					: await pb.files.getToken({ signal: controller.signal });
+				for (let i = 0; i < filenames.length && !controller.signal.aborted; i += 3) {
+					await Promise.all(
+						filenames.slice(i, i + 3).map(async (filename) => {
+							const size = await fetchFileSize(
+								pb.files.getURL(currentRecord, filename, { token }),
+								controller.signal
+							);
+							if (!controller.signal.aborted) sizes.set(filename, size);
+						})
+					);
+				}
 			} catch {
 				// File metadata must not prevent editing the edition.
 			}
@@ -410,10 +422,10 @@
 						Main model{assetFilenames.length > 0
 							? ` + ${assetFilenames.length} companion${assetFilenames.length === 1 ? '' : 's'}`
 							: ''}
-						{#if fileSizes[modelFilename] != null}
-							 · {humanSize(fileSizes[modelFilename]!)}
-						{:else}
-							 · Size unavailable
+						{#if fileSizes.get(modelFilename) != null}
+							· {humanSize(fileSizes.get(modelFilename)!)}
+						{:else if fileSizes.has(modelFilename)}
+							· Size unavailable
 						{/if}
 					</div>
 				</div>
@@ -430,27 +442,34 @@
 				</div>
 			</div>
 
-			{#if assetFilenames.length > 0}
-				<ul
-					class="mt-2 max-h-40 space-y-1 overflow-y-auto rounded border border-base-300 bg-base-100 p-2"
-				>
-					{#each assetFilenames as filename (filename)}
-						<li class="flex items-center justify-between gap-2">
-							<span class="truncate text-xs" title={filename}>{filename}</span>
-							<span class="shrink-0 text-xs text-base-content/50">
-								{fileSizes[filename] != null ? humanSize(fileSizes[filename]!) : 'Size unavailable'}
-							</span>
-							<button
-								type="button"
-								class="btn btn-ghost btn-xs"
-								onclick={() => removeCompanion(filename)}
-								{disabled}
-								aria-label="Remove {filename}">×</button
-							>
-						</li>
-					{/each}
-				</ul>
-			{/if}
+			<details bind:open={detailsOpen}>
+				<summary class="cursor-pointer text-xs">File details</summary>
+				{#if detailsOpen && assetFilenames.length > 0}
+					<ul
+						class="mt-2 max-h-40 space-y-1 overflow-y-auto rounded border border-base-300 bg-base-100 p-2"
+					>
+						{#each assetFilenames as filename (filename)}
+							<li class="flex items-center justify-between gap-2">
+								<span class="truncate text-xs" title={filename}>{filename}</span>
+								<span class="shrink-0 text-xs text-base-content/50">
+									{fileSizes.get(filename) != null
+										? humanSize(fileSizes.get(filename)!)
+										: fileSizes.has(filename)
+											? 'Size unavailable'
+											: '…'}
+								</span>
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs"
+									onclick={() => removeCompanion(filename)}
+									{disabled}
+									aria-label="Remove {filename}">×</button
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</details>
 		</div>
 
 		{#if isObj}

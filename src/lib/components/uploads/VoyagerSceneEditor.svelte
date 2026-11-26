@@ -4,6 +4,7 @@
 	import { base } from '$app/paths';
 	import type { RecordModel } from 'pocketbase';
 	import { pb } from '$lib/database/client';
+	import { correctedMedia, legacyAliases } from '$lib/components/voyager/edition-reader';
 	import {
 		getVoyagerResourceRoot,
 		DEFAULT_VOYAGER_VERSION,
@@ -147,6 +148,8 @@
 				model: current.modelFile ? assets[current.modelFile] : '',
 				title,
 				assets,
+				legacyMedia: Object.fromEntries(legacyAliases(assets)),
+				correctedMedia,
 				companionFiles: expectedFiles.modelAssets
 			};
 			session = crypto.randomUUID();
@@ -287,7 +290,8 @@
 				</div>
 			</div>
 			<p class="mb-2 text-sm text-base-content/70">
-				Article and media changes are kept in this editor until you choose Save scene &amp; close.
+				Select the scene or a model to see its articles. The viewer lists articles from all of them.
+				Changes stay in this editor until you choose Save scene &amp; close.
 			</p>
 			{#if error}<p role="alert" class="mb-2 rounded-box bg-error/10 p-2 text-sm text-base-content">
 					{error}

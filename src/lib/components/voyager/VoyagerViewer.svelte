@@ -20,7 +20,7 @@
 	import type { AnimationApplication } from '../../../../static/voyager/animation-controls.js';
 	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { installViewerFetch } from './viewer-fetch';
-	import { loadVoyagerArticle } from './edition-reader';
+	import { loadVoyagerArticle, relatedOpticArticle } from './edition-reader';
 	import {
 		ViewerResources,
 		captureViewerErrors,
@@ -530,6 +530,8 @@
 					const mapped = Object.hasOwn(files.byBasename, name) && files.byBasename[name];
 					if (mapped && new URL('.', article).href === new URL('.', mapped).href)
 						return loadVoyagerArticle(mapped, files.byBasename, '', controller.signal);
+					if (relatedOpticArticle(article, files.byBasename))
+						return loadVoyagerArticle(article.href, files.byBasename, '', controller.signal);
 				}
 				return original.call(assetReader, path);
 			};

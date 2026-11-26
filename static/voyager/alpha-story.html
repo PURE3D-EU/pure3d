@@ -73,6 +73,8 @@
 							model,
 							title,
 							assets,
+							legacyMedia = {},
+							correctedMedia = {},
 							companionFiles = []
 						} = event.data;
 						const directory = new URL(root || '/', location.href);
@@ -164,20 +166,36 @@
 							}
 							return parsed.body.innerHTML;
 						};
-						const readableHtml = (html) => {
+						const readableHtml = (html, article) => {
 							const parsed = new DOMParser().parseFromString(html, 'text/html');
 							for (const element of parsed.querySelectorAll('[src], [href], [poster]')) {
 								for (const attribute of ['src', 'href', 'poster']) {
 									const value = element.getAttribute(attribute);
 									if (!value || value.startsWith('#')) continue;
 									const url = new URL(value, directory);
-									const name = decodeURIComponent(url.pathname.split('/').pop());
+									let name;
+									try {
+										name = decodeURIComponent(url.pathname.split('/').pop());
+									} catch {
+										continue;
+									}
+									const key = name
+										.toLowerCase()
+										.replace(/[^a-z0-9.]+/g, '_')
+										.replace(/_+\./g, '.');
+									const corrections = correctedMedia[article.slice(0, 19)];
+									const stored =
+										(Object.hasOwn(assets, name) && assets[name]) ||
+										(Object.hasOwn(legacyMedia, key) && legacyMedia[key]) ||
+										(corrections &&
+											Object.hasOwn(corrections, name) &&
+											legacyMedia[corrections[name]]);
 									if (
 										url.origin === directory.origin &&
 										url.pathname.startsWith(directory.pathname) &&
-										assets[name]
+										stored
 									) {
-										const mapped = new URL(assets[name]);
+										const mapped = new URL(stored);
 										const { params, hash } = publicSuffix(url);
 										for (const [key, value] of params) mapped.searchParams.append(key, value);
 										mapped.hash = hash;
@@ -309,13 +327,13 @@
 									method === 'HEAD'
 										? null
 										: /\.html?$/i.test(key)
-											? readableHtml(await file.text())
+											? readableHtml(await file.text(), name)
 											: file
 								);
 							}
 							const response = await originalFetch(mapped || input, init);
 							if (owned && method === 'GET' && /\.html?$/i.test(name) && response.ok)
-								return new Response(readableHtml(await response.text()), {
+								return new Response(readableHtml(await response.text(), name), {
 									headers: { 'Content-Type': 'text/html' }
 								});
 							if (
