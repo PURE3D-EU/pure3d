@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.10.1 - 2026-11-26
+
+### Fixes
+
+- accept submissions without an account (8ad645df)
+
 ## v2.10.0 - 2026-11-25
 
 ### Features
